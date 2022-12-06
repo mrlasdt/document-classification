@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                // "--image",
+                // "data/207/idcard_cmnd_8-9-2022",
+                // "--det_cfg",
+                // "/home/sds/datnt/mmdetection/logs/textdet-add-synth-add-book-add-id/yolox_s_8x8_300e_cocotext_1280.py",
+                // "--det_ckpt",
+                // "/home/sds/datnt/mmdetection/logs/textdet-add-synth-add-book-add-id/best_lite.pth",
+                // "--cls_cfg",
+                // "/home/sds/datnt/mmocr/logs/satrn_big_2022-04-25/satrn_big.py",
+                // "--cls_ckpt",
+                // "/home/sds/datnt/mmocr/logs/satrn_big_2022-04-25/best.pth",
+                // "--save_dir",
+                // "/home/sds/hungbnt/KIE_pretrained/data/pseudo_label/207_extend",
+            ]
+        }
+    ]
+}
