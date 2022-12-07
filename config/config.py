@@ -1,5 +1,5 @@
 # GLOBAL VARS
-DEVICE = "cuda:1"
+DEVICE = "cuda:0"
 # DEVICE = "cpu"
 # DEVICE = "cpu"  # for debugging https://stackoverflow.com/questions/51691563/cuda-runtime-error-59-device-side-assert-triggered
 # DEVICE = "cpu"

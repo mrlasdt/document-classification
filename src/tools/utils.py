@@ -1,12 +1,12 @@
-import pandas as pd
-from pathlib import Path
 import os
 import json
+
 
 def read_txt_lines(file_path):
     with open(file_path, 'r') as fp:
         lines = fp.read().splitlines()
     return lines
+
 
 def read_json_file(file_path):
     with open(file_path, 'r', encoding='utf8') as f:

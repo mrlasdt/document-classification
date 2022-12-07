@@ -221,10 +221,10 @@ class RuleBaseDocClassifier:
 # %%
 if __name__ == "__main__":
     # %%
-    # engine = OcrEngineForYoloX(DET_CFG, DET_CKPT, CLS_CFG, CLS_CKPT)
-    # cls_model = RuleBaseDocClassifier(engine)
-    # print("Done init")
-    # cls_model.infer("data/Sample_input/Case_2_ghep_toan_bo/")  # OK
+    engine = OcrEngineForYoloX(DET_CFG, DET_CKPT, CLS_CFG, CLS_CKPT)
+    cls_model = RuleBaseDocClassifier(engine)
+    print("Done init")
+    cls_model.infer("data/Sample_input/Case_2_ghep_toan_bo/")  # OK
 
     # %%
     df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD.csv"
