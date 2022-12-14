@@ -33,7 +33,7 @@ DDOC_LABELS_TO_TITLE = {
     "POS08": "Thông Báo Đi Nước Ngoài",
     "CCCD_front": "CĂN CƯỚC CÔNG DÂN",
     "CCCD_back": "Đặc điểm nhân dạng CỤC TRƯỞNG CỤC",
-    "CMND_front": "GIẤY CHỨNG MINH NHÂN DÂN",
+    "CMND_front": "CHỨNG MINH NHÂN DÂN",
     "CMND_back": "Tôn giáo DẤU VẾT RIÊNG VÀ DỊ HÌNH",
     "DXN102": "ĐƠN XIN XÁC NHẬN HAI NGƯỜI LÀ MỘT",
     "BIRTH_CERT": "GIẤY KHAI SINH",
@@ -140,7 +140,7 @@ class RuleBaseDocClassifier:
         return lbboxes[:max_length], lwords[:max_length]
 
     @staticmethod
-    def classify_by_template_number(lwords: list[str], max_length):
+    def classify_by_template_number(lwords: List[str], max_length: int) -> str:
         # TODO: add confident score of word and bbox to return value
         # TODO: valid assumption that there is only 1 template number in a page, currently return first occurence
         ocr_str = "".join(lwords[:max_length])
@@ -153,7 +153,7 @@ class RuleBaseDocClassifier:
         # return -1
 
     @staticmethod
-    def classify_by_title(lwords: list[str], threshold, max_length):
+    def classify_by_title(lwords: List[str], threshold: float, max_length: int) -> str:
         ocr_str = "".join(lwords[:max_length])
         for cls_, title in RuleBaseDocClassifier.cfg["ddoc_label_to_title"].items():
             title = title.replace(" ", "")
@@ -162,8 +162,8 @@ class RuleBaseDocClassifier:
         return -1
 
     @staticmethod
-    def classify(lwords, threshold=0.85, max_length=50) -> int:
-        """ 
+    def classify(lwords: List[str], threshold=0.85, max_length=50) -> int:
+        """
         threshold: threshold of longest common subsequence to match with title
         max_length: number of first words extracted from page to compare with title
         """
@@ -173,8 +173,11 @@ class RuleBaseDocClassifier:
             cls_ = RuleBaseDocClassifier.classify_by_title(lwords, threshold, max_length)
         return RuleBaseDocClassifier.cfg["others_label"] if cls_ == -1 else cls_
 
-    def predict(self, img, batch_mode=False, batch_size=16) -> str:
-        _lbboxes, lwords = self.run_ocr(img, batch_mode=batch_mode, batch_size=batch_size)
+    def predict(self, inp: Union[str, np.ndarray, List[str], List[np.ndarray]], batch_mode=False, batch_size=16) -> str:
+        """
+        Accept image path or ndarray or list of them, return class
+        """
+        _lbboxes, lwords = self.run_ocr(inp, batch_mode=batch_mode, batch_size=batch_size)
         cls_ = self.classify(lwords) if not batch_mode else [self.classify(l) for l in lwords]
         return cls_
 
@@ -194,9 +197,10 @@ class RuleBaseDocClassifier:
                 dout[file_name][cls_].append(i)
                 curr_first_page_of_doc_idx = i
                 curr_cls_of_doc = cls_
+                break
         return dout
 
-    @staticmethod
+    @ staticmethod
     def eval(df_path: str, threshold=0.85, max_length=50):
         df = pd.read_csv(df_path)
         y_true = [DDOC_LABELS_TO_IDX[label] for label in df["label"]]
@@ -206,7 +210,7 @@ class RuleBaseDocClassifier:
             pred = DDOC_LABELS_TO_IDX[RuleBaseDocClassifier.classify(lwords, threshold, max_length)]
             y_pred.append(pred)
             if pred != y_true[i]:
-                RuleBaseDocClassifier.classify(lwords, threshold, max_length)  # for debugging
+                # RuleBaseDocClassifier.classify(lwords, threshold, max_length)  # for debugging
                 print("*" * 100)
                 print(df["img_path"].iloc[i])
                 print(ocr_path)
@@ -221,7 +225,8 @@ if __name__ == "__main__":
     engine = OcrEngineForYoloX(DET_CFG, DET_CKPT, CLS_CFG, CLS_CKPT)
     cls_model = RuleBaseDocClassifier(engine)
     print("Done init")
-    cls_model.infer("data/Sample_input/Case_2_ghep_toan_bo/")  # OK
+    # cls_model.infer("data/Sample_input/Case_2_ghep_toan_bo/")  # OK
+    cls_model.infer("/mnt/ssd500/hungbnt/DocumentClassification/data")  # OK
 
     # %%
     df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD.csv"

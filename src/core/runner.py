@@ -1,10 +1,11 @@
 import json
-from .core.hub import get_entries
+from .hub import get_entries
 # from .template_modules.losses import __mapping__ as loss_maps
 # from .template_modules.metrics import __mapping__ as metric_maps
 # from .template_modules.trainers import __mapping__ as trainer_maps
 # from .template_modules.optimizers import __mapping__ as optimizer_map
-from .models import __mapping__ as models_map
+from .training.data import __mapping__ as datasets_map
+from .training.model import __mapping__ as models_map
 import os
 
 
@@ -24,34 +25,35 @@ class Runner:
         self.config = config
         self.save_config_path = save_config_path
         self.name = name or "train_config"
-        self.global_config = config["global"]
-        data_config = config["data"]
-        model_config = config["model"]
-        optimizer_config = config["optimizer"]
-        trainer_config = config['trainer']
-        print("creating train, valid loader") if verbose else None
-        self.train, self.valid = self._get_data(data_config)
-        # if verbose:
-        #     print("train: ", len(self.train))
-        #     print("valid: ", len(self.valid)) if self.valid is not None else None
-        print("creating model") if verbose else None
-        self.model = self._get_model(model_config)
+        if config["data"]:
+            print("creating train, valid loader") if verbose else None
+            self.train, self.valid = self._get_data(config["data"])
+            if verbose:
+                print("train: ", len(self.train))
+                print("valid: ", len(self.valid)) if self.valid is not None else None
+        if config["model"]:
+            print("creating model") if verbose else None
+            self.model = self._get_model(config["model"])
+        if config["optimizer"]:
+            self.optimizer = self._get_optimizer(config["optimizer"])
+            print("optimizer ", self.optimizer) if verbose else None
+        if config['trainer']:
+            self.trainer = self._get_trainer(config["trainer"])
+            print("creating trainer ") if verbose else None
         if verbose:
-            save_model_txt_path = os.path.join(trainer_config['save_dir'], "model.txt")
+            save_model_txt_path = os.path.join(config["trainer"]['save_dir'], "model.txt")
             print("printing model to ", save_model_txt_path)
             with open(save_model_txt_path, "w") as handle:
                 handle.write(str(self.model))
-        self.optimizer = self._get_optimizer(optimizer_config)
-        print("optimizer: ", self.optimizer) if verbose else None
-
-        self.trainer = self._get_trainer(trainer_config)
-        print("trainer ", self.trainer) if verbose else None
 
     def _get_data(self, data_config):
-        if data_config['custom'] == True:
+        if data_config['custom']:
             return self._get_custom_module('data', data_config)
+        elif data_config['name'] in datasets_map:
+            return self._get_default_module(datasets_map, data_config['train'])
         else:
-            raise NotImplementedError("No template config found for data")
+            raise NotImplementedError(
+                "Invalid data config. Please specify either a custom data path or a valid data name")
 
     def _get_model(self, model_config):
         if model_config['custom'] == True:
@@ -65,13 +67,13 @@ class Runner:
     def _get_trainer(self, trainer_config):
         if trainer_config['custom'] == True:
             return self._get_custom_module(
-                'trainer', trainer_config, args=[self.model, self.optimizer])
+                'trainer', trainer_config, args=(self.model, self.optimizer))
         else:
             raise NotImplementedError("No template config found for trainer")
 
     def _get_optimizer(self, optimizer_config):
         if optimizer_config['custom'] == True:
-            return self._get_custom_module('trainer', optimizer_config, args=(self.model,))
+            return self._get_custom_module('trainer', optimizer_config, args=(self.model,))  # len(args)>2
         else:
             raise NotImplementedError("No template config found for trainer")
 

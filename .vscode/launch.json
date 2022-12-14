@@ -24,6 +24,8 @@
                 // "/home/sds/datnt/mmocr/logs/satrn_big_2022-04-25/best.pth",
                 // "--save_dir",
                 // "/home/sds/hungbnt/KIE_pretrained/data/pseudo_label/207_extend",
+                "--cfg",
+                "donut",
             ]
         }
     ]

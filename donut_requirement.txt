@@ -1,0 +1,4 @@
+#https://colab.research.google.com/github/NielsRogge/Transformers-Tutorials/blob/master/Donut/RVL-CDIP/Fine_tune_Donut_on_toy_RVL_CDIP_%28document_image_classification%29.ipynb?authuser=2#scrollTo=ot1nP9YHz8co
+sentencepiece
+datasets
+git+https://github.com/huggingface/transformers.git

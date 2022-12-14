@@ -1,4 +1,4 @@
-from .config import BASE
+from .config import DONUT_CFG
 __mapping__ = {
-    'base': BASE,
+    'donut': DONUT_CFG,
 }

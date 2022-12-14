@@ -21,12 +21,18 @@ def sort_bboxes_and_words(lbboxes, lwords)->tuple[list, list]:
     list_lines, _ = words_to_lines(lWords)
     lwords_ = list()
     lbboxes_ = list()
+    ## TEMP
+    f = open("test.txt","w+", encoding="utf-8")
+    for line in list_lines:
+        f.write("{}\n".format(line.text))
+    f.close()
+    ##
     for line in list_lines:
         for word_group in line.list_word_groups:
             for word in word_group.list_words:
                 lwords_.append(word.text)
                 lbboxes_.append(word.boundingbox)
-    return (lbboxes_, lwords_)
+    return lbboxes_, lwords_
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -93,5 +99,3 @@ if __name__ == "__main__":
             f.write("{}\t{}\t{}\t{}\t{}\n".format(xmin,ymin,xmax,ymax,text))
         f.close()
 
-      
-    
