@@ -1,0 +1,36 @@
+
+ SAMSUNG SDS
+ SAMSUNG SDS
+ BRITYWORKS CHAT BOT SOLUTION
+ USER'S FEEDBACK
+ REVIEWER NAME: CAO THANH NGA
+ TITLE: Manager - Survices, lesb 8 Business Support Surices team
+ Inflastinctule Scharces de epai men
+ COMPANY: VIETNAM INTERNATIONAL COMMERCIAL JOINT STOCK BANK
+ PRODUCT EVALUATION
+ In scale of 5, please Mark (X) your satisfication with Brity Vorks Chatbot solution from Samsung SDS:
+ 1 2 3 4 UT
+ (Very (Bad) (Average) (Good) (Very
+ bad) Good)
+ Chat bot AI Performance in General V
+ Ability of understanding user intentions V
+ (e.g. Goodbye Intent VS Greeting Intent)
+ Ability of detecting Entities
+ (e.g. correctly) ability to recognize the systems name I
+ Ability of Understanding Mixed-languages
+ (e.g. "tôi muốn đổi pass trên ABC System ") V
+ Vietnamese understanding without
+ accent marks
+ "buoi sang " VS "buổi sáng ") V
+ (e.g.
+ Ability of Understanding Mistypos
+ (i.e. "xin chào VS "xin chafo" ) V
+ No. of Messengers Interface ( Zulip Zalo,
+ Viber, Knox, Line, Slack) V
+ Ability of Understanding Abbreviation V
+ (e.g. "acc. " VS "account") )
+ Chat bot Response Time V
+ Online Information Searching V
+ (e.g. getting Exchage Rate)
+ Pham Minh ThangBusiness Sales Group 2
+ 1656221591603516

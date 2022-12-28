@@ -94,7 +94,6 @@ def longestCommonSubsequence(text1: str, text2: str) -> int:
             dp[i + 1][j + 1] = 1 + dp[i][j] if c == d else max(dp[i][j + 1], dp[i + 1][j])
     return dp[-1][-1]
 
-
 class RuleBaseDocClassifier:
     cfg = CONFIG  # static
 
@@ -245,7 +244,7 @@ if __name__ == "__main__":
     # RuleBaseDocClassifier.classify_by_template_number(lwords)
     # RuleBaseDocClassifier.classify_by_title(lwords, 0.85, 50)
     # %%
-    # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/")  # OK
+    # cls_model.infer("data/Sample_input/Case_1_th_roi-toan-bo/")  # OK
     # cls_model.infer("data/Sample_input/Case_2_ghep_mot_phan/")  # OK
     # cls_model.infer("data/Sample_input/Case_2_ghep_toan_bo/")  # OK
 
@@ -261,3 +260,6 @@ if __name__ == "__main__":
     # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS05/1.pdf")
     # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS06/1.pdf")
     # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS08/1.pdf")
+
+
+    

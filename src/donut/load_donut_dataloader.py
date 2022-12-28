@@ -50,15 +50,10 @@ class DonutDatasetForDocumentClassification(Dataset):
         self.prompt_end_token = prompt_end_token if prompt_end_token else task_start_token
         self._class_token = class_token
         self.df = df
-        self.images = self.load_images_from_df(df["img_path"])
         self.gt_token_sequences = self.df["label"].apply(self.label2token_sequence)
         self.add_tokens([self.end_tag(t) for t in labels] + [self.task_start_token, self.prompt_end_token,
                         self.start_tag(self._class_token), self.end_tag(self._class_token)])
         self.prompt_end_token_id = self.processor.tokenizer.convert_tokens_to_ids(self.prompt_end_token)
-
-    @staticmethod
-    def load_images_from_df(df_: pd.Series):
-        return [Image.open(img_path).convert("RGB") for img_path in df_]
 
     @staticmethod
     def start_tag(token):
@@ -112,7 +107,7 @@ class DonutDatasetForDocumentClassification(Dataset):
             labels : masked labels (model doesn't need to predict prompt and pad token)
         """
 
-        sample = self.images[idx]
+        sample = Image.open(self.df["img_path"].iloc[idx]).convert("RGB")
         # pixel values (we remove the batch dimension)
         pixel_values = self.processor(sample, random_padding=self.split == "train", return_tensors="pt").pixel_values
         if self.split != "train":
@@ -148,7 +143,7 @@ def split_df(df, test_size, shuffle, seed, stratify):
 
 def load_data(
         df_path, pretrained_processor_path, task_start_token, prompt_end_token, labels, image_size, max_seq_len,
-        batch_size, test_size, shuffle, seed, stratify):
+        batch_size, test_size, shuffle, seed, stratify, num_workers):
     df = pd.read_csv(df_path)
     df_train, df_val = split_df(df, test_size, shuffle, seed, stratify)
     processor = DonutProcessor.from_pretrained(pretrained_processor_path)
@@ -160,8 +155,8 @@ def load_data(
     val_dataset = DonutDatasetForDocumentClassification(
         df_val, processor, split="val", max_length=max_seq_len, labels=labels, task_start_token=task_start_token,
         prompt_end_token=prompt_end_token)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, num_workers=num_workers)
     return train_dataloader, val_dataloader
 
 

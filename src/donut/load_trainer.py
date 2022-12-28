@@ -50,13 +50,13 @@ class Trainer:
             self.optimizer.zero_grad()
         print("Loss:", running_loss / len(dataloader))
 
-    def val_one_epoch(self, dataloader):
+    def val_one_epoch(self, dataloader, best_acc):
         self.model.eval()
         dataset = dataloader.dataset
         processor = dataset.processor
         preds = []
         gts = []
-        for d in tqdm(dataset, total=len(dataset)):
+        for i, d in tqdm(enumerate(dataset), total=len(dataset)):
             # prepare encoder inputs
             pixel_values = d["pixel_values"].to(self.device)
             # prepare decoder inputs
@@ -80,8 +80,12 @@ class Trainer:
 
             # turn into JSON
             seq = processor.batch_decode(outputs.sequences)[0]
-            preds.append(dataset.token_sequence2label(seq))
-            gts.append(dataset.token_sequence2label(d["labels"]))
+            pred = dataset.token_sequence2label(seq)
+            gt = dataset.token_sequence2label(d["labels"])
+            preds.append(pred)
+            gts.append(gt)
+            if best_acc > 0.96 and pred != gt:  # for debug only #TODO: remove this
+                print(dataset.df['img_path'].iloc[i])
 
         print(classification_report(gts, preds))
         return accuracy_score(gts, preds)
@@ -102,7 +106,7 @@ class Trainer:
         for epoch in range(self.n_epoches):
             print("Epoch:", epoch)
             self.train_one_epoch(train_dataloader)
-            acc = self.val_one_epoch(val_dataloader)
+            acc = self.val_one_epoch(val_dataloader, best_acc)
             best_acc = self.update_metric_and_save_model(best_acc, acc)
 
 

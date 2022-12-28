@@ -3,7 +3,9 @@ DEVICE = "cuda:0"
 # DEVICE = "cpu"  # for debugging https://stackoverflow.com/questions/51691563/cuda-runtime-error-59-device-side-assert-triggered
 # KIE_LABELS = ['gen', 'nk', 'nv', 'dobk', 'dobv', 'other']
 IGNORE_LABEL = 'OTHERS'
-LABELS = ['POS01', 'POS02', 'POS03', 'POS04', 'POS05', 'POS06', 'POS08']
+# LABELS = ['POS01', 'POS02', 'POS03', 'POS04', 'POS05', 'POS06', 'POS08']
+LABELS = ['POS01', 'POS02', 'POS03', 'POS04', 'POS05', 'POS06', 'POS08', "DCYCBH",
+          "GUQ1", "GUQ2", "QLBH", "QLBHYT", "TDDG", "TKSK", "TTTK", "XNDY", "YCBH"]
 SEED = 42
 ##### DONUT CONFIG ##########################################
 # re run load_model.py as main if any change in IMG_SIZE AND MAX_SEQ_LEN
@@ -17,18 +19,19 @@ DONUT_CFG = {
         "custom": True,
         "path": "src/donut/load_donut_dataloader.py",
         "method": "load_data",
-        "df_path": "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD.csv",
+        "df_path": "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_and_Samsung.csv",
         'pretrained_processor_path': '/mnt/ssd500/hungbnt/DocumentClassification/weights/donut/pretrained/clova_donut_processor',
         "task_start_token": DONUT_TASK_PROMPT,
         "prompt_end_token": DONUT_TASK_PROMPT,
         'labels': LABELS,
         "image_size": DONUT_IMG_SIZE,
         "max_seq_len": DONUT_MAX_SEQ_LEN,
-        "batch_size": 12,
+        "batch_size": 8,
         'test_size': 0.2,
         "shuffle": True,
         "seed": SEED,
-        "stratify": True
+        "stratify": True,
+        "num_workers": 16,
     },
 
     "model": {
@@ -53,7 +56,7 @@ DONUT_CFG = {
         "method": "load_trainer",
         "labels": LABELS,
         "save_dir": '/mnt/ssd500/hungbnt/DocumentClassification/weights/donut',
-        "n_epoches": 5,
+        "n_epoches": 32,
         "device": DEVICE,
         "task_prompt": DONUT_TASK_PROMPT
     },
