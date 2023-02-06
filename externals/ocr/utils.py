@@ -1,7 +1,29 @@
 from PIL import ImageFont, ImageDraw, Image
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import os
+
+
+def get_name(file_path, ext: bool = True):
+    file_path_ = os.path.basename(file_path)
+    return file_path_ if ext else os.path.splitext(file_path_)[0]
+
+
+def construct_file_path(dir, file_path, ext=''):
+    '''
+    args:
+        dir: /path/to/dir
+        file_path /example_path/to/file.txt
+        ext = '.json'
+    return 
+        /path/to/dir/file.json
+    '''
+    return os.path.join(
+        dir, get_name(file_path,
+                      True)) if ext == '' else os.path.join(
+        dir, get_name(file_path,
+                      False)) + ext
 
 
 def read_image_file(img_path):

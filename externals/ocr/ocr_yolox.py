@@ -78,7 +78,7 @@ class OcrEngineForYoloX():
 
     def inference(self, img, batch_mode=False, batch_size=16):
         """
-        Accept image path or ndarray or list of them, return class
+        Accept image path or ndarray or list of them, return ocr result or list of them
         """
         if not batch_mode:
             if isinstance(img, str):
@@ -100,7 +100,7 @@ class OcrEngineForYoloX():
                     llwords.append(lwords)
                 lllbboxes.append(llbboxes)
                 lllwords.append(llwords)
-            return flatten(llbboxes), flatten(llwords)
+            return flatten(lllbboxes), flatten(lllwords)
 
 
 if __name__ == "__main__":

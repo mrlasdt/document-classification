@@ -1,0 +1,8 @@
+usage: usage: %prog [options] files or directories [-h]
+                                                   [--requirements-file PATH]
+                                                   [-f IGNORE_FILES]
+                                                   [-m IGNORE_MODS]
+                                                   [-r IGNORE_REQS] [-s] [-v]
+                                                   [-d] [-V]
+                                                   [paths ...]
+usage: %prog [options] files or directories: error: unrecognized arguments: --ignore-reqs=mm*
