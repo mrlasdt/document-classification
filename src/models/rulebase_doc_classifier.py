@@ -27,8 +27,9 @@ CLS_CKPT = "/home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/best.pth"
 DF_DOC_PATH = "/mnt/ssd500/hungbnt/DocumentClassification/data/Static/FWD_documents_list.xlsx"
 ACCEPTED_EXT = [".pdf", ".png", ".jpg", ".jpeg"]
 OTHERS_LABEL = "OTHERS"
-THRESH_HOLD = 0.8
+THRESH_HOLDS = [0.8, 0.95]
 MAX_LENGTH = 30
+OFFSET = 0.1
 # DDOC_LABELS_TO_TITLE = {
 #     "POS01": "Phiếu Yêu Cầu Điều Chỉnh Thông Tin Cá Nhân",
 #     "POS02": "Phiếu Yêu Cầu Điều Chỉnh Sản Phẩm Bảo Hiểm",
@@ -91,17 +92,53 @@ def longestCommonSubsequence(text1: str, text2: str) -> int:
     return dp[-1][-1]
 
 
+def longest_common_subsequence_with_idx(s1, s2):
+    """
+    This implementation uses dynamic programming to calculate the length of the LCS, and uses a path array to keep track of the characters in the LCS. 
+    The longest_common_subsequence function takes two strings as input, and returns a tuple with three values: 
+    the length of the LCS, 
+    the index of the first character of the LCS in the first string, 
+    and the index of the last character of the LCS in the first string.
+    """
+    m = len(s1)
+    n = len(s2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    path = [[None] * (n + 1) for _ in range(m + 1)]
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if s1[i - 1] == s2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+                path[i][j] = (i - 1, j - 1)
+            else:
+                if dp[i][j - 1] > dp[i - 1][j]:
+                    dp[i][j] = dp[i][j - 1]
+                    path[i][j] = (i, j - 1)
+                else:
+                    dp[i][j] = dp[i - 1][j]
+                    path[i][j] = (i - 1, j)
+
+    lcs = []
+    i, j = m, n
+    while path[i][j] is not None:
+        if path[i][j] == (i - 1, j - 1):
+            lcs.append(s1[i - 1])
+        i, j = path[i][j]
+    return (len(lcs), m - len(lcs), m - 1)
+
+
 class RuleBaseDocClassifier(BaseDocClasifier):
     def __init__(
             self, df_doc_path: str, ocr_engine: OcrEngineForYoloX = None, accepted_ext: list[str] = ACCEPTED_EXT,
-            other_docid: str = OTHERS_LABEL, threshold: float = THRESH_HOLD, max_length: int = MAX_LENGTH):
+            other_docid: str = OTHERS_LABEL, thresholds: float = THRESH_HOLDS, max_length: int = MAX_LENGTH,
+            offset: float = OFFSET):
         """ Classify document base on defined rule
         Args:
             df_doc_path (str): _description_
             ocr_engine (OcrEngineForYoloX, optional): _description_. Defaults to None.
             accepted_ext (list[str], optional): _description_. Defaults to ACCEPTED_EXT.
             other_docid (str, optional): the docid of other documents. Defaults to OTHERS_LABEL.
-            threshold (float, optional): threshold of longest common subsequence to match with title. Defaults to THRESH_HOLD.
+            thresholds (tuple[float,float], optional): respectively coarse and fine threshold of longest common subsequence to match with title. Defaults to THRESH_HOLD.
             max_length (int, optional): number of first words extracted from page to compare with title. Defaults to MAX_LENGTH.
         """
         self.ocr_engine = ocr_engine
@@ -110,7 +147,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         self.accepted_ext = accepted_ext
         self.ddoc_title_to_docid, self.ddoc_title_to_no_pages = self.extract_dict_from_excel(df_doc_path)
         self.max_length = max_length
-        self.threshold = threshold
+        self.thresholds = thresholds
+        self.offset = offset
 
     @staticmethod
     def extract_dict_from_excel(df_path: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -192,12 +230,16 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         # return -1
         return ""
 
-    def classify_by_title(self, lwords: List[str], threshold: float, max_length: int) -> str:
+    def classify_by_title(self, lwords: List[str], thresholds: tuple[float, float], max_length: int) -> str:
         ocr_str = "".join(lwords[:max_length])
         for title, docid in self.ddoc_title_to_docid.items():
             title = title.replace(" ", "")
-            if longestCommonSubsequence(title, ocr_str) / len(title) > threshold:
-                return docid
+            lcs_len, start_idx_lcs, end_idx_lcs = longest_common_subsequence_with_idx(ocr_str, title)
+            if lcs_len / len(title) > thresholds[0]:
+                shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - self.offset))                                          :int((end_idx_lcs + 1) * (1 + self.offset))]
+                lcs_len = longestCommonSubsequence(shorten_ocr_str, title)
+                if lcs_len / len(title) > thresholds[1]:
+                    return docid
         return ""
 
     def preprocess(self, input_path: str) -> list[str]:
@@ -214,7 +256,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         _lbboxes, lwords = self.preprocess(input_path)
         # cls_ = RuleBaseDocClassifier.classify_by_template_number(lwords, max_length)
         # if cls_ == -1:
-        cls_ = self.classify_by_title(lwords, max_length=self.max_length, threshold=self.threshold)
+        cls_ = self.classify_by_title(lwords, max_length=self.max_length, thresholds=self.thresholds)
         return self.other_docid if not cls_ else cls_
 
     def infer(self, dir_path: str):
@@ -275,7 +317,7 @@ if __name__ == "__main__":
 
     # %%
     df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/33forms.csv"
-    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH, threshold=0.95, max_length=55).eval(df_path)
+    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH, thresholds=0.95, max_length=55).eval(df_path)
     # TODO:
     # Tờ khai sức khỏe bị nhầm với Phiếu Yêu Cầu Điều Chỉnh Hợp Đồng Bảo Hiểm Nhân Thọ và Tờ Khai Sức Khỏe
     # Hồ Sơ Yêu Cầu Bảo Hiểm bị nhầm với Xác nhận đồng ý
