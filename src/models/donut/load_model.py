@@ -17,7 +17,7 @@ if __name__ == "__main__":
     import sys
     FILE = Path(__file__).absolute()
     sys.path.append(FILE.parents[2].as_posix())
-    from config import config as cfg
+    from config import global_var as cfg
     config = VisionEncoderDecoderConfig.from_pretrained(cfg.DONUT_DEFAULT_PRETRAINED_MODEL)
     config.encoder.image_size = cfg.DONUT_IMG_SIZE  # (height, width)
     config.decoder.max_length = cfg.DONUT_MAX_SEQ_LEN

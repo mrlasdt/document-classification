@@ -1,4 +1,4 @@
-from config.config import DOC_LABELS, SEED, DEVICE
+from config.global_var import DOC_LABELS, SEED, DEVICE
 ##### DONUT CONFIG ##########################################
 # re run load_model.py as main if any change in IMG_SIZE AND MAX_SEQ_LEN
 # DONUT_IMG_SIZE = (1280, 960)  # (height, width) too large, have to run with batch_size <2

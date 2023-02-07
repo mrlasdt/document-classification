@@ -31,7 +31,10 @@ def read_image_file(img_path):
     return image
 
 
-def read_ocr_result_from_txt(file_path):
+def read_ocr_result_from_txt(file_path: str) -> tuple[list, list]:
+    '''
+    return list of bounding boxes, list of words
+    '''
     with open(file_path, 'r') as f:
         lines = f.read().splitlines()
     boxes, words = [], []
@@ -40,7 +43,7 @@ def read_ocr_result_from_txt(file_path):
             continue
         x1, y1, x2, y2, text = line.split("\t")
         x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-        if text != " ":
+        if text and text != " ":
             words.append(text)
             boxes.append((x1, y1, x2, y2))
     return boxes, words

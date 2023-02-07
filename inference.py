@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # timeit.timeit(setup=setup, stmt=stmt, number=100000)
 
     # %%
-    from config import config as cfg
+    from config import global as cfg
     from src.core.runner import Runner
     
     runner = Runner(cfg.DONUT_CFG)

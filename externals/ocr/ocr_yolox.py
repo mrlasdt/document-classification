@@ -14,7 +14,7 @@ from mmocr.apis import init_detector as init_classifier
 # print('2', time.time() - now)
 from mmocr.apis.inference import model_inference
 # print('3', time.time() - now)
-from config import config as cfg
+from config import global as cfg
 import numpy as np
 from externals.ocr.utils import read_image_file, get_crop_img_and_bbox
 # print('4', time.time() - now)

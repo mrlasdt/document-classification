@@ -53,6 +53,7 @@ class Trainer:
     def val_one_epoch(self, dataloader, best_acc):
         self.model.eval()
         dataset = dataloader.dataset
+        dataset.set_format(type="torch", device=self.device)
         processor = dataset.processor
         preds = []
         gts = []
