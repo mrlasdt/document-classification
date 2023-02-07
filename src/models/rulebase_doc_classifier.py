@@ -27,8 +27,8 @@ CLS_CKPT = "/home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/best.pth"
 DF_DOC_PATH = "/mnt/ssd500/hungbnt/DocumentClassification/data/Static/FWD_documents_list.xlsx"
 ACCEPTED_EXT = [".pdf", ".png", ".jpg", ".jpeg"]
 OTHERS_LABEL = "OTHERS"
-THRESH_HOLDS = [0.8, 0.95]
-MAX_LENGTH = 30
+THRESHHOLDS = [0.8, 0.95]
+MAX_LENGTH = 55
 OFFSET = 0.1
 # DDOC_LABELS_TO_TITLE = {
 #     "POS01": "Phiếu Yêu Cầu Điều Chỉnh Thông Tin Cá Nhân",
@@ -92,7 +92,7 @@ def longestCommonSubsequence(text1: str, text2: str) -> int:
     return dp[-1][-1]
 
 
-def longest_common_subsequence_with_idx(s1, s2):
+def longest_common_subsequence_with_idx(X, Y):
     """
     This implementation uses dynamic programming to calculate the length of the LCS, and uses a path array to keep track of the characters in the LCS. 
     The longest_common_subsequence function takes two strings as input, and returns a tuple with three values: 
@@ -100,37 +100,50 @@ def longest_common_subsequence_with_idx(s1, s2):
     the index of the first character of the LCS in the first string, 
     and the index of the last character of the LCS in the first string.
     """
-    m = len(s1)
-    n = len(s2)
-    dp = [[0] * (n + 1) for _ in range(m + 1)]
-    path = [[None] * (n + 1) for _ in range(m + 1)]
+    m, n = len(X), len(Y)
+    L = [[0 for i in range(n + 1)] for j in range(m + 1)]
 
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
-            if s1[i - 1] == s2[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1] + 1
-                path[i][j] = (i - 1, j - 1)
+    # Following steps build L[m+1][n+1] in bottom up fashion. Note
+    # that L[i][j] contains length of LCS of X[0..i-1] and Y[0..j-1]
+    for i in range(m + 1):
+        for j in range(n + 1):
+            if i == 0 or j == 0:
+                L[i][j] = 0
+            elif X[i - 1] == Y[j - 1]:
+                L[i][j] = L[i - 1][j - 1] + 1
             else:
-                if dp[i][j - 1] > dp[i - 1][j]:
-                    dp[i][j] = dp[i][j - 1]
-                    path[i][j] = (i, j - 1)
-                else:
-                    dp[i][j] = dp[i - 1][j]
-                    path[i][j] = (i - 1, j)
+                L[i][j] = max(L[i - 1][j], L[i][j - 1])
 
-    lcs = []
-    i, j = m, n
-    while path[i][j] is not None:
-        if path[i][j] == (i - 1, j - 1):
-            lcs.append(s1[i - 1])
-        i, j = path[i][j]
-    return (len(lcs), m - len(lcs), m - 1)
+        # Create a string variable to store the lcs string
+    lcs = L[i][j]
+    # Start from the right-most-bottom-most corner and
+    # one by one store characters in lcs[]
+    i = m
+    j = n
+
+    while i > 0 and j > 0:
+
+        # If current character in X[] and Y are same, then
+        # current character is part of LCS
+        if X[i - 1] == Y[j - 1]:
+
+            i -= 1
+            j -= 1
+
+        # If not same, then find the larger of two and
+        # go in the direction of larger value
+        elif L[i - 1][j] > L[i][j - 1]:
+            i -= 1
+
+        else:
+            j -= 1
+    return lcs, i, i + lcs
 
 
 class RuleBaseDocClassifier(BaseDocClasifier):
     def __init__(
             self, df_doc_path: str, ocr_engine: OcrEngineForYoloX = None, accepted_ext: list[str] = ACCEPTED_EXT,
-            other_docid: str = OTHERS_LABEL, thresholds: float = THRESH_HOLDS, max_length: int = MAX_LENGTH,
+            other_docid: str = OTHERS_LABEL, thresholds: float = THRESHHOLDS, max_length: int = MAX_LENGTH,
             offset: float = OFFSET):
         """ Classify document base on defined rule
         Args:
@@ -151,11 +164,21 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         self.offset = offset
 
     @staticmethod
-    def extract_dict_from_excel(df_path: str) -> tuple[dict[str, str], dict[str, str]]:
+    def _sort_dict_by_key_length(d: dict, reverse=False) -> dict:
+        # https://www.geeksforgeeks.org/python-program-to-sort-dictionary-by-key-lengths/
+        l = sorted(list(d.items()), key=lambda key: len(key[0]), reverse=reverse)
+        res = {ele[0]: ele[1] for ele in l}
+        return res
+
+    def extract_dict_from_excel(self, df_path: str) -> tuple[dict[str, str], dict[str, str]]:
         df = pd.read_excel(df_path, index_col=0).dropna(how="all")
         df = df[df["Do_classify(Y/N)"] == 1]
+        # prioritize the form with longer title length
+        # df.sort_values(by='Title', key=lambda x: len(x), inplace=True, ascending=False)
         ddoc_title_to_docid = dict(zip(df['Title'], df["DocID"]))
-        ddoc_title_to_no_pages = dict(zip(df['Title'], df["No. pages"])) | {OTHERS_LABEL: 0}
+        ddoc_title_to_docid = self._sort_dict_by_key_length(ddoc_title_to_docid, reverse=True)
+
+        ddoc_title_to_no_pages = dict(zip(df['Title'], df["No. pages"])) | {self.other_docid: 0}
         return ddoc_title_to_docid, ddoc_title_to_no_pages
 
     def read_from_dir(self, dir_path: str, include_txt: bool = True) -> Dict[str,
@@ -230,13 +253,16 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         # return -1
         return ""
 
-    def classify_by_title(self, lwords: List[str], thresholds: tuple[float, float], max_length: int) -> str:
+    def classify_by_title(
+            self, lwords: List[str],
+            thresholds: tuple[float, float],
+            max_length: int, offset: float) -> str:
         ocr_str = "".join(lwords[:max_length])
         for title, docid in self.ddoc_title_to_docid.items():
             title = title.replace(" ", "")
             lcs_len, start_idx_lcs, end_idx_lcs = longest_common_subsequence_with_idx(ocr_str, title)
             if lcs_len / len(title) > thresholds[0]:
-                shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - self.offset))                                          :int((end_idx_lcs + 1) * (1 + self.offset))]
+                shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - offset)):int((end_idx_lcs + 1) * (1 + offset))]
                 lcs_len = longestCommonSubsequence(shorten_ocr_str, title)
                 if lcs_len / len(title) > thresholds[1]:
                     return docid
@@ -256,7 +282,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         _lbboxes, lwords = self.preprocess(input_path)
         # cls_ = RuleBaseDocClassifier.classify_by_template_number(lwords, max_length)
         # if cls_ == -1:
-        cls_ = self.classify_by_title(lwords, max_length=self.max_length, thresholds=self.thresholds)
+        cls_ = self.classify_by_title(lwords, max_length=self.max_length,
+                                      thresholds=self.thresholds, offset=self.offset)
         return self.other_docid if not cls_ else cls_
 
     def infer(self, dir_path: str):
@@ -285,7 +312,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         y_pred = []
         diff = []
         for i, ocr_path in tqdm(enumerate(df["ocr_path"])):
-            if ocr_path == "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/33forms/Báo cáo kiểm tra y tế dành cho người lớn (cập nhật 31052021)/Báo cáo kiểm tra y tế dành cho người lớn (cập nhật 31052021)_0.txt":
+            if ocr_path == "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/33forms/Phiếu Yêu Cầu Điều Chỉnh HĐBHNT và Tờ Khai Sức Khỏe (cập nhật 31052021)/Phiếu Yêu Cầu Điều Chỉnh HĐBHNT và Tờ Khai Sức Khỏe (cập nhật 31052021)_0.txt":
                 print("DEBUGGING")
 
             pred = self.classify(ocr_path)
@@ -300,7 +327,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
                 print(gt, pred)
         df["pred"] = y_pred
         df["diff"] = diff
-        df.to_csv("/mnt/ssd500/hungbnt/DocumentClassification/data/33forms_pred.csv")
+        df.to_csv(f"{df_path}_pred.csv")
         print(classification_report(y_true, y_pred))
         print(confusion_matrix(y_true, y_pred))
         return y_true, y_pred
@@ -316,38 +343,69 @@ if __name__ == "__main__":
     # cls_model.infer("/mnt/ssd500/hungbnt/DocumentClassification/data")  # OK
 
     # %%
-    df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/33forms.csv"
-    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH, thresholds=0.95, max_length=55).eval(df_path)
-    # TODO:
-    # Tờ khai sức khỏe bị nhầm với Phiếu Yêu Cầu Điều Chỉnh Hợp Đồng Bảo Hiểm Nhân Thọ và Tờ Khai Sức Khỏe
-    # Hồ Sơ Yêu Cầu Bảo Hiểm bị nhầm với Xác nhận đồng ý
+    # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/33forms.csv"
+    df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_and_Samsung.csv"
+    # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_val.csv`"
+    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(df_path)
+    # # TODO:
+    # # Tờ khai sức khỏe bị nhầm với Phiếu Yêu Cầu Điều Chỉnh Hợp Đồng Bảo Hiểm Nhân Thọ và Tờ Khai Sức Khỏe
+    # # Hồ Sơ Yêu Cầu Bảo Hiểm bị nhầm với Xác nhận đồng ý
+
+    # # %%
+    # # %%
+
+    # # %%
+    # # ocr_path = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/POS08/50.pdf.txt"
+    # # ocr_path = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/POS01/SKM_458e\ Ag22101217531.pdf.txt"
+    # # _lbboxes, lwords = read_ocr_result_from_txt(ocr_path)
+    # # RuleBaseDocClassifier.classify(lwords)
+    # # RuleBaseDocClassifier.classify_by_template_number(lwords)
+    # # RuleBaseDocClassifier.classify_by_title(lwords, 0.85, 50)
+    # # %%
+    # # cls_model.infer("data/Sample_input/Case_1_th_roi-toan-bo/")  # OK
+    # # cls_model.infer("data/Sample_input/Case_2_ghep_mot_phan/")  # OK
+    # # cls_model.infer("data/Sample_input/Case_2_ghep_toan_bo/")  # OK
+
+    # # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/CMND.pdf")
+    # # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/Giay_khai_sinh.pdf")
+    # # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/Giay_xac_nhan.pdf")
+    # # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/Hoa_don.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS01/1_PDFsam_Scan.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS02/1.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS03/1.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS03/1.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS04/1.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS05/1.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS06/1.pdf")
+    # # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS08/1.pdf")
+
+    # # %%
+    # import pandas as pd
+    # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/Static/FWD_documents_list.xlsx"
+    # df = pd.read_excel(df_path, index_col=0).dropna(how="all")
+    # df = df[df["Do_classify(Y/N)"] == 1]
+    # ddoc_title_to_docid = dict(zip(df['Title'], df["DocID"]))
+    # ddoc_title_to_no_pages = dict(zip(df['Title'], df["No. pages"]))
+
+    # # %%
+    # len(ddoc_title_to_docid)
+
+    # # %%
+    # len(df['Title'])
+
+    # # %%
+    # df.T
+    # # %%
+
+    # # %%
+    # df.dropna(subset=["Title"], how="all", inplace=True)
+    # len(df)
+    # # %%
+    # df["Title"].tolist()
 
     # %%
-    # %%
+    # {k:v for k in [1,1,2,2] for v in [3,4,5,6]}
+    # df.sort_values(by='Title', key=lambda x: len(str(x)), inplace=True, ascending=False)
+    # df.loc["Ti"]
 
     # %%
-    # ocr_path = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/POS08/50.pdf.txt"
-    # ocr_path = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/POS01/SKM_458e\ Ag22101217531.pdf.txt"
-    # _lbboxes, lwords = read_ocr_result_from_txt(ocr_path)
-    # RuleBaseDocClassifier.classify(lwords)
-    # RuleBaseDocClassifier.classify_by_template_number(lwords)
-    # RuleBaseDocClassifier.classify_by_title(lwords, 0.85, 50)
-    # %%
-    # cls_model.infer("data/Sample_input/Case_1_th_roi-toan-bo/")  # OK
-    # cls_model.infer("data/Sample_input/Case_2_ghep_mot_phan/")  # OK
-    # cls_model.infer("data/Sample_input/Case_2_ghep_toan_bo/")  # OK
-
-    # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/CMND.pdf")
-    # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/Giay_khai_sinh.pdf")
-    # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/Giay_xac_nhan.pdf")
-    # cls_model.infer("data/Sample_input/Case_1_tach_roi-toan-bo/Hoa_don.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS01/1_PDFsam_Scan.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS02/1.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS03/1.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS03/1.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS04/1.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS05/1.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS06/1.pdf")
-    # cls_model.infer("/mnt/hdd2T/AICR/Projects/FWD/Phase1/Completed_forms_SAMSUNG/POS08/1.pdf")
-
-# %%

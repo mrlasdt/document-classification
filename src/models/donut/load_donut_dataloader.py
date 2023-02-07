@@ -172,7 +172,7 @@ if __name__ == "__main__":
     processor = DonutProcessor.from_pretrained(
         "/mnt/ssd500/hungbnt/DocumentClassification/weights/pretrained/clova_donut_processor")
     max_seq_len = 4
-    labels = cfg.LABELS
+    labels = cfg.DOC_LABELS
     batch_size = 8
     test_size = 0.2
     shuffle = True
