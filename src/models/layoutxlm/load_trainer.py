@@ -83,7 +83,7 @@ class Trainer:
         for epoch in range(self.n_epoches):
             print("Epoch:", epoch)
             self.train_one_epoch(train_dataloader)
-            acc = self.val_one_epoch(val_dataloader.to(self.device))
+            acc = self.val_one_epoch(val_dataloader)
             best_acc = self.update_metric_and_save_model(best_acc, acc)
 
 
