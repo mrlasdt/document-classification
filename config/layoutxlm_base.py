@@ -1,4 +1,5 @@
 from .global_var import DOC_LABELS, DEVICE, SEED
+PRETRAINED_TOKENIZER_PATH = "microsoft/layoutxlm-base"
 LAYOUTXLM_CFG = {
     "data": {
         "custom": True,

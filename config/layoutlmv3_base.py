@@ -1,4 +1,5 @@
 from .global_var import DOC_LABELS, DEVICE, SEED
+PRETRAINED_TOKENIZER_PATH = "microsoft/layoutlmv3-base"
 LAYOUTLMV3_CFG = {
     "data": {
         "custom": True,
