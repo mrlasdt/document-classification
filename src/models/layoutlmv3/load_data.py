@@ -41,7 +41,7 @@ def _normalize_box(box, width, height):
     ]
 
 
-def load_ocr_result(example):
+def load_ocr_result_and_normalize(example):
     r"""Load OCR labels, i.e. (word, bbox) pairs, into the input DataFrame containing of columns (image_path, ocr_path, label)"""
     ocr_path = example['ocr_path']
     image_path = example["img_path"]
@@ -90,8 +90,8 @@ def load_data(
     val_dataset = Dataset.from_pandas(df_val)
 
     print("Loading OCR result ...")
-    train_dataset = train_dataset.map(lambda example: load_ocr_result(example))
-    val_dataset = val_dataset.map(lambda example: load_ocr_result(example))
+    train_dataset = train_dataset.map(lambda example: load_ocr_result_and_normalize(example))
+    val_dataset = val_dataset.map(lambda example: load_ocr_result_and_normalize(example))
 
     print("Preparing dataset ...")
     features = Features({
