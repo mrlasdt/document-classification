@@ -17,6 +17,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, f1_score, roc_auc_score
 import pandas as pd
 from base_doc_classifier import BaseDocClasifier
+from unidecode import unidecode
 # INPUT_DIR = Path("/mnt/ssd500/hungbnt/DocumentClassification/data/Sample_input/Case_1_tach_roi-toan-bo")
 # SAVE_DIR = Path("/mnt/ssd500/hungbnt/DocumentClassification/results").joinpath(INPUT_DIR.name)
 
@@ -24,12 +25,13 @@ DET_CFG = "/home/sds/datnt/mmdetection/logs/textdet-fwd/yolox_s_8x8_300e_cocotex
 DET_CKPT = "/home/sds/datnt/mmdetection/logs/textdet-fwd/best_bbox_mAP_epoch_100.pth"
 CLS_CFG = "/home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/satrn_big.py"
 CLS_CKPT = "/home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/best.pth"
-DF_DOC_PATH = "/mnt/ssd500/hungbnt/DocumentClassification/data/Static/FWD_documents_list.xlsx"
+# DF_DOC_PATH = "/mnt/ssd500/hungbnt/DocumentClassification/data/Static/FWD_documents_list.csv"
+DF_DOC_PATH = "/mnt/ssd500/hungbnt/DocumentClassification/data/Static/FWD_documents_list_custom_for_16forms.csv"
 ACCEPTED_EXT = [".pdf", ".png", ".jpg", ".jpeg"]
 OTHERS_LABEL = "OTHERS"
-THRESHHOLDS = [0.8, 0.95]
+THRESHHOLDS = [0.8, 0.91]
 MAX_LENGTH = 55
-OFFSET = 0.1
+OFFSET = 0.0
 # DDOC_LABELS_TO_TITLE = {
 #     "POS01": "Phiếu Yêu Cầu Điều Chỉnh Thông Tin Cá Nhân",
 #     "POS02": "Phiếu Yêu Cầu Điều Chỉnh Sản Phẩm Bảo Hiểm",
@@ -94,10 +96,10 @@ def longestCommonSubsequence(text1: str, text2: str) -> int:
 
 def longest_common_subsequence_with_idx(X, Y):
     """
-    This implementation uses dynamic programming to calculate the length of the LCS, and uses a path array to keep track of the characters in the LCS. 
-    The longest_common_subsequence function takes two strings as input, and returns a tuple with three values: 
-    the length of the LCS, 
-    the index of the first character of the LCS in the first string, 
+    This implementation uses dynamic programming to calculate the length of the LCS, and uses a path array to keep track of the characters in the LCS.
+    The longest_common_subsequence function takes two strings as input, and returns a tuple with three values:
+    the length of the LCS,
+    the index of the first character of the LCS in the first string,
     and the index of the last character of the LCS in the first string.
     """
     m, n = len(X), len(Y)
@@ -105,12 +107,17 @@ def longest_common_subsequence_with_idx(X, Y):
 
     # Following steps build L[m+1][n+1] in bottom up fashion. Note
     # that L[i][j] contains length of LCS of X[0..i-1] and Y[0..j-1]
+    right_idx = 0
+    max_lcs = 0
     for i in range(m + 1):
         for j in range(n + 1):
             if i == 0 or j == 0:
                 L[i][j] = 0
             elif X[i - 1] == Y[j - 1]:
                 L[i][j] = L[i - 1][j - 1] + 1
+                if L[i][j] > max_lcs:
+                    max_lcs = L[i][j]
+                    right_idx = i
             else:
                 L[i][j] = max(L[i - 1][j], L[i][j - 1])
 
@@ -120,24 +127,23 @@ def longest_common_subsequence_with_idx(X, Y):
     # one by one store characters in lcs[]
     i = m
     j = n
-
+    # right_idx = 0
     while i > 0 and j > 0:
-
         # If current character in X[] and Y are same, then
         # current character is part of LCS
         if X[i - 1] == Y[j - 1]:
 
             i -= 1
             j -= 1
-
         # If not same, then find the larger of two and
         # go in the direction of larger value
         elif L[i - 1][j] > L[i][j - 1]:
+            # right_idx = i if not right_idx else right_idx #the first change in L should be the right index of the lcs
             i -= 1
-
         else:
             j -= 1
-    return lcs, i, i + lcs
+    # TODO: fix the algorithm so that right_idx is correct (always larger than i+lcs)
+    return lcs, i, max(i + lcs, right_idx-1)
 
 
 class RuleBaseDocClassifier(BaseDocClasifier):
@@ -171,7 +177,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         return res
 
     def extract_dict_from_excel(self, df_path: str) -> tuple[dict[str, str], dict[str, str]]:
-        df = pd.read_excel(df_path, index_col=0).dropna(how="all")
+        df = pd.read_excel(df_path, index_col=0) if df_path.endswith(".xlsx") else pd.read_csv(df_path, index_col=0)
+        df.dropna(how="all", inplace=True)
         df = df[df["Do_classify(Y/N)"] == 1]
         # prioritize the form with longer title length
         # df.sort_values(by='Title', key=lambda x: len(x), inplace=True, ascending=False)
@@ -251,6 +258,9 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         #     match = re.search(r"POS0(?P<cls>\d{1})_20", word)
         # return "POS0{}".format(match["cls"]) if match else -1
         # return -1
+        # ocr_str = "".join(lwords[:max_length])
+        # match = re.search(r"POS0(?P<cls>\d{1})_20", ocr_str)
+        # return "POS-0{}".format(match["cls"]) if match else -1
         return ""
 
     def classify_by_title(
@@ -258,15 +268,23 @@ class RuleBaseDocClassifier(BaseDocClasifier):
             thresholds: tuple[float, float],
             max_length: int, offset: float) -> str:
         ocr_str = "".join(lwords[:max_length])
+        best_docid = ""
+        best_score = 0.0
         for title, docid in self.ddoc_title_to_docid.items():
+            if docid in ["GUQ1", "GUQ2"]:
+                print("DEBUGGING")
             title = title.replace(" ", "")
             lcs_len, start_idx_lcs, end_idx_lcs = longest_common_subsequence_with_idx(ocr_str, title)
             if lcs_len / len(title) > thresholds[0]:
                 shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - offset)):int((end_idx_lcs + 1) * (1 + offset))]
-                lcs_len = longestCommonSubsequence(shorten_ocr_str, title)
-                if lcs_len / len(title) > thresholds[1]:
-                    return docid
-        return ""
+                # remove accent and lowercase may improve performance since the ocr text may have minor error
+                lcs_len = longestCommonSubsequence(unidecode(shorten_ocr_str).lower(), unidecode(title).lower())
+                # if lcs_len / len(title) > max(thresholds[1], best_score):  # shorten_ocr_str may not work :v
+                # use shorten_ocr_str instead title length can eliminate case where long ocr_str produce a long lcs than the title
+                if lcs_len / len(shorten_ocr_str) > max(thresholds[1], best_score):
+                    best_docid = docid
+                    best_score = lcs_len / len(title)
+        return best_docid
 
     def preprocess(self, input_path: str) -> list[str]:
         input_ = self.read_from_file(input_path)
@@ -305,18 +323,32 @@ class RuleBaseDocClassifier(BaseDocClasifier):
                 break
         return dout
 
-    def eval(self, df_val_path: str):
+    def print_config(self):
+        print("[INFO]: Configuration")
+        print("thresholds: ", self.thresholds)
+
+    def eval(self, df_val_path: str, save_pred: bool = True):
+        self.print_config()
         df = pd.read_csv(df_val_path)
         # y_true = [DDOC_LABELS_TO_IDX[label] for label in df["label"]]
         y_true = []
         y_pred = []
         diff = []
         for i, ocr_path in tqdm(enumerate(df["ocr_path"])):
-            if ocr_path == "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/33forms/Phiếu Yêu Cầu Điều Chỉnh HĐBHNT và Tờ Khai Sức Khỏe (cập nhật 31052021)/Phiếu Yêu Cầu Điều Chỉnh HĐBHNT và Tờ Khai Sức Khỏe (cập nhật 31052021)_0.txt":
-                print("DEBUGGING")
 
-            pred = self.classify(ocr_path)
             gt = df["label"].iloc[i]
+            if gt not in ["GUQ1", "GUQ2"]:
+                continue
+            if ocr_path in [
+                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/GUQ1_28.txt",
+                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/GUQ1_2.txt",
+                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/GUQ1_21.txt",
+                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/839df78cae9176cf2f809.txt",
+                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ2/9f42f901a71c7f42260d1.txt",
+                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ2/4e74676b1f7cc7229e6d3.txt",
+            ]:
+                print("DEBUGGING")
+            pred = self.classify(ocr_path)
             y_pred.append(pred)
             y_true.append(gt)
             diff.append(pred == gt)
@@ -325,11 +357,12 @@ class RuleBaseDocClassifier(BaseDocClasifier):
                 print(df["img_path"].iloc[i])
                 print(ocr_path)
                 print(gt, pred)
-        df["pred"] = y_pred
-        df["diff"] = diff
-        df.to_csv(f"{df_path}_pred.csv")
+        if save_pred:
+            df["pred"] = y_pred
+            df["diff"] = diff
+            df.to_csv(f"{df_path}_pred.csv")
         print(classification_report(y_true, y_pred))
-        print(confusion_matrix(y_true, y_pred))
+        print(confusion_matrix(y_true, y_pred, labels=set(list(df["label"].values) + ["OTHERS"])))
         return y_true, y_pred
 
 
@@ -343,14 +376,11 @@ if __name__ == "__main__":
     # cls_model.infer("/mnt/ssd500/hungbnt/DocumentClassification/data")  # OK
 
     # %%
-    # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/33forms.csv"
+    # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/33forms_pred.csv"
     df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_and_Samsung.csv"
     # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_val.csv`"
-    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(df_path)
-    # # TODO:
-    # # Tờ khai sức khỏe bị nhầm với Phiếu Yêu Cầu Điều Chỉnh Hợp Đồng Bảo Hiểm Nhân Thọ và Tờ Khai Sức Khỏe
-    # # Hồ Sơ Yêu Cầu Bảo Hiểm bị nhầm với Xác nhận đồng ý
-
+    # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/202302_3forms.csv"
+    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(df_path, save_pred=False)
     # # %%
     # # %%
 
@@ -360,7 +390,7 @@ if __name__ == "__main__":
     # # _lbboxes, lwords = read_ocr_result_from_txt(ocr_path)
     # # RuleBaseDocClassifier.classify(lwords)
     # # RuleBaseDocClassifier.classify_by_template_number(lwords)
-    # # RuleBaseDocClassifier.classify_by_title(lwords, 0.85, 50)
+    # # RuleBaseDocClassifier.classify_by_title(lwords, 0.85, 50)P
     # # %%
     # # cls_model.infer("data/Sample_input/Case_1_th_roi-toan-bo/")  # OK
     # # cls_model.infer("data/Sample_input/Case_2_ghep_mot_phan/")  # OK
@@ -407,5 +437,4 @@ if __name__ == "__main__":
     # {k:v for k in [1,1,2,2] for v in [3,4,5,6]}
     # df.sort_values(by='Title', key=lambda x: len(str(x)), inplace=True, ascending=False)
     # df.loc["Ti"]
-
-    # %%
+# %%

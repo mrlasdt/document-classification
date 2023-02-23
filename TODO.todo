@@ -1,0 +1,4 @@
+☐ Fix ---000 problem in GUQ1
+☐ fix the algorithm so that right_idx is correct (always larger than i+lcs)
+☐ fix classify by template number
+☐ implement ensemble classifier

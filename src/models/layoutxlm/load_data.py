@@ -67,7 +67,7 @@ def load_data(
         df_path, pretrained_tokenizer_path, labels, image_shape, max_seq_len,
         batch_size, test_size, shuffle, seed, stratify, num_workers):
     df = pd.read_csv(df_path)
-    df_train, df_val = split_df(df, test_size, shuffle, seed, stratify)
+    df_train, df_val = split_df(df, test_size, shuffle, seed, stratify) #image_path, ocr_path, label
     print('Train: ', len(df_train))
     print('Val: ', len(df_val))
     train_dataset = Dataset.from_pandas(df_train)

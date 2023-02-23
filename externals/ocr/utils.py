@@ -112,7 +112,7 @@ def get_dynamic_params_for_bbox_of_label(text, x1, y1, w, h, img_h, img_w, font)
 def visualize_bbox_and_label(
         img, bboxes, texts, bbox_color=(60, 180, 200),
         text_color=(0, 0, 0),
-        format="xyxy", is_vnese=False):
+        format="xyxy", is_vnese=False, draw_text=True):
     ori_img_type = type(img)
     if is_vnese:
         img = Image.fromarray(img) if ori_img_type is np.ndarray else img
@@ -153,6 +153,7 @@ def visualize_bbox_and_label(
             kwarg_rec_text = {"color": bbox_color, "thickness": cv2.FILLED}
         # draw a bounding box rectangle and label on the img
         fdraw_bbox(*arg_rec, **kwarg_rec)
-        fdraw_bbox(*arg_rec_text, **kwarg_rec_text)
-        fdraw_text(*arg_text, **kwarg_text)  # text have to put in front of rec_text
+        if draw_text:
+            fdraw_bbox(*arg_rec_text, **kwarg_rec_text)
+            fdraw_text(*arg_text, **kwarg_text)  # text have to put in front of rec_text
     return np.array(img) if ori_img_type is np.ndarray and is_vnese else img
