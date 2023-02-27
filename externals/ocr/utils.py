@@ -157,3 +157,4 @@ def visualize_bbox_and_label(
             fdraw_bbox(*arg_rec_text, **kwarg_rec_text)
             fdraw_text(*arg_text, **kwarg_text)  # text have to put in front of rec_text
     return np.array(img) if ori_img_type is np.ndarray and is_vnese else img
+

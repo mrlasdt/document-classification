@@ -165,7 +165,7 @@ if __name__ == "__main__":
     # %% try load_data
     import sys
     sys.path.append("/mnt/ssd500/hungbnt/DocumentClassification")
-    from config import global as cfg
+    from config import global_var as cfg
     from transformers import DonutProcessor
 
     df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD.csv"

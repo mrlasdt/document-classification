@@ -18,6 +18,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 import pandas as pd
 from base_doc_classifier import BaseDocClasifier
 from unidecode import unidecode
+from collections import defaultdict
 # INPUT_DIR = Path("/mnt/ssd500/hungbnt/DocumentClassification/data/Sample_input/Case_1_tach_roi-toan-bo")
 # SAVE_DIR = Path("/mnt/ssd500/hungbnt/DocumentClassification/results").joinpath(INPUT_DIR.name)
 
@@ -29,60 +30,9 @@ CLS_CKPT = "/home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/best.pth"
 DF_DOC_PATH = "/mnt/ssd500/hungbnt/DocumentClassification/data/Static/FWD_documents_list_custom_for_16forms.csv"
 ACCEPTED_EXT = [".pdf", ".png", ".jpg", ".jpeg"]
 OTHERS_LABEL = "OTHERS"
-THRESHHOLDS = [0.8, 0.91]
+THRESHHOLDS = {"coarse":0.8, "fine":0.9, "fine_corrected_coef":0.0} #fine_corrected_coef seems to decrease the performance? (see the case of /mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/TDDG/e5e48b5e1449cc1795584.txt)
 MAX_LENGTH = 55
 OFFSET = 0.0
-# DDOC_LABELS_TO_TITLE = {
-#     "POS01": "Phiếu Yêu Cầu Điều Chỉnh Thông Tin Cá Nhân",
-#     "POS02": "Phiếu Yêu Cầu Điều Chỉnh Sản Phẩm Bảo Hiểm",
-#     "POS03": "Phiếu Yêu Cầu Điều Chỉnh Thông Tin Hợp Đồng",
-#     "POS04": "Phiếu Yêu Cầu Khôi Phục Hiệu Lực Hợp Đồng",
-#     "POS05": "Phiếu Yêu Cầu Thanh Toán",
-#     "POS06": "Phiếu Yêu Cầu Điều Chỉnh Dành Cho Nghiệp Vụ Hợp Đồng Bảo Hiểm Liên Kết Đơn Vị",
-#     "POS08": "Thông Báo Đi Nước Ngoài",
-#     "CCCD_front": "CĂN CƯỚC CÔNG DÂN",
-#     "CCCD_back": "Đặc điểm nhân dạng CỤC TRƯỞNG CỤC",
-#     "CMND_front": "CHỨNG MINH NHÂN DÂN",
-#     "CMND_back": "Tôn giáo DẤU VẾT RIÊNG VÀ DỊ HÌNH",
-#     "DXN102": "ĐƠN XIN XÁC NHẬN HAI NGƯỜI LÀ MỘT",
-#     "BIRTH_CERT": "GIẤY KHAI SINH",
-# }
-
-# DDOC_LABELS_TO_NO_PAGES = {
-#     "POS01": 2,
-#     "POS02": 2,
-#     "POS03": 2,
-#     "POS04": 2,
-#     "POS05": 2,
-#     "POS06": 2,
-#     "POS08": 2,
-#     "CCCD_front": 1,
-#     "CCCD_back": 1,
-#     "CMND_front": 1,
-#     "CMND_back": 1,
-#     "DXN102": 1,
-#     "BIRTH_CERT": 1,
-#     OTHERS_LABEL: 0,
-# }
-
-# %%
-
-# def longest_common_substring(s1, s2):
-#     m = len(s1)
-#     n = len(s2)
-#     # https://www.geeksforgeeks.org/longest-common-substring-dp-29/
-#     LCSuff = [[0 for k in range(n + 1)] for l in range(m + 1)]
-#     result = 0
-#     for i in range(m + 1):
-#         for j in range(n + 1):
-#             if (i == 0 or j == 0):
-#                 LCSuff[i][j] = 0
-#             elif (s1[i - 1] == s2[j - 1]):
-#                 LCSuff[i][j] = LCSuff[i - 1][j - 1] + 1
-#                 result = max(result, LCSuff[i][j])
-#             else:
-#                 LCSuff[i][j] = 0
-#     return result
 
 
 def longestCommonSubsequence(text1: str, text2: str) -> int:
@@ -143,7 +93,7 @@ def longest_common_subsequence_with_idx(X, Y):
         else:
             j -= 1
     # TODO: fix the algorithm so that right_idx is correct (always larger than i+lcs)
-    return lcs, i, max(i + lcs, right_idx-1)
+    return lcs, i, max(i + lcs, right_idx - 1)
 
 
 class RuleBaseDocClassifier(BaseDocClasifier):
@@ -168,9 +118,30 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         self.max_length = max_length
         self.thresholds = thresholds
         self.offset = offset
+        self.dpriority_docid = self.generate_priority_dict()
+
+    def generate_priority_dict(self):
+        """
+        generate a priority dictionary of documents to solve the following case:
+        doci = "Xác nhận động ý và tờ khai sức khỏe"
+        docj = "Tờ khai sức khỏe"
+        Since doci contains docj and longer than docj, it has a high chance to be missclassied as document j
+        => We should prioritize doci over docj
+        dprior = {docj : [docj1 docj2]}...
+        """
+        dprior = defaultdict(list)
+        for ititle, idocid in self.ddoc_title_to_docid.items():
+            for jtitle, jdocid in self.ddoc_title_to_docid.items():
+                if jtitle in ititle and len(jtitle) < len(ititle):
+                    dprior[jdocid].append(idocid)
+        return dprior
 
     @staticmethod
     def _sort_dict_by_key_length(d: dict, reverse=False) -> dict:
+        """
+        sort the self.ddoc_title_to_docid list so that the longer title can be process first
+        this is align with the self.classify_title algorithm and self.dpriority_docid dict
+        """
         # https://www.geeksforgeeks.org/python-program-to-sort-dictionary-by-key-lengths/
         l = sorted(list(d.items()), key=lambda key: len(key[0]), reverse=reverse)
         res = {ele[0]: ele[1] for ele in l}
@@ -263,6 +234,28 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         # return "POS-0{}".format(match["cls"]) if match else -1
         return ""
 
+    def customize_preprocess_for_specific_docid(self, doc_id: str, s: str) -> str:
+        if doc_id == "GUQ1":
+            s = re.sub(r"-+0+", "", s)
+        return s
+
+
+    def lcs_matching(self, ocr_str:str, title:str, mode:str) -> tuple[float,int,int]:
+        if mode == "coarse":
+            lcs_len, start_idx_lcs, end_idx_lcs = longest_common_subsequence_with_idx(ocr_str, title)
+            coarse_score = lcs_len / len(title)
+            return coarse_score, start_idx_lcs, end_idx_lcs
+        elif mode == "fine":
+            # remove accent and lowercase may improve performance since the ocr text may have minor error
+            lcs_len = longestCommonSubsequence(unidecode(ocr_str).lower(), unidecode(title).lower())
+            # there is a case like POS03 shorten_ocr_str contains POS01 inside, so POS01 was misclassied as POS03 since the lcs/len(title) score was 1.0 => corrected by a term len(title)/len(shorten_ocr_str)
+            fine_score = lcs_len / len(title)
+            return fine_score,0,0
+        else:
+            raise ValueError("Invalid mode: ", mode)
+
+
+
     def classify_by_title(
             self, lwords: List[str],
             thresholds: tuple[float, float],
@@ -271,19 +264,22 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         best_docid = ""
         best_score = 0.0
         for title, docid in self.ddoc_title_to_docid.items():
-            if docid in ["GUQ1", "GUQ2"]:
+            if docid in ["TKSK"]:
                 print("DEBUGGING")
             title = title.replace(" ", "")
-            lcs_len, start_idx_lcs, end_idx_lcs = longest_common_subsequence_with_idx(ocr_str, title)
-            if lcs_len / len(title) > thresholds[0]:
-                shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - offset)):int((end_idx_lcs + 1) * (1 + offset))]
-                # remove accent and lowercase may improve performance since the ocr text may have minor error
-                lcs_len = longestCommonSubsequence(unidecode(shorten_ocr_str).lower(), unidecode(title).lower())
-                # if lcs_len / len(title) > max(thresholds[1], best_score):  # shorten_ocr_str may not work :v
-                # use shorten_ocr_str instead title length can eliminate case where long ocr_str produce a long lcs than the title
-                if lcs_len / len(shorten_ocr_str) > max(thresholds[1], best_score):
+            coarse_score, start_idx_lcs, end_idx_lcs = self.lcs_matching(ocr_str, title, "coarse")
+            if coarse_score < thresholds["coarse"]:
+                continue
+            shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - offset)):int((end_idx_lcs + 1) * (1 + offset))]
+            shorten_ocr_str = self.customize_preprocess_for_specific_docid(docid, shorten_ocr_str)
+            fine_score, _, _ = self.lcs_matching(shorten_ocr_str, title, "fine")
+            corrected_coef = len(title) / len(shorten_ocr_str)
+            corrected_score = fine_score*corrected_coef
+            if fine_score > thresholds["fine"] and corrected_coef > thresholds["fine_corrected_coef"] and corrected_score > best_score and best_docid not in self.dpriority_docid[docid]:
                     best_docid = docid
-                    best_score = lcs_len / len(title)
+                    best_score = corrected_score
+            if best_score == 1.0:
+                return best_docid # improve efficiency, no need to loop through all title if best_score is already 1.0
         return best_docid
 
     def preprocess(self, input_path: str) -> list[str]:
@@ -337,17 +333,19 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         for i, ocr_path in tqdm(enumerate(df["ocr_path"])):
 
             gt = df["label"].iloc[i]
-            if gt not in ["GUQ1", "GUQ2"]:
-                continue
-            if ocr_path in [
-                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/GUQ1_28.txt",
-                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/GUQ1_2.txt",
-                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/GUQ1_21.txt",
-                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ1/839df78cae9176cf2f809.txt",
-                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ2/9f42f901a71c7f42260d1.txt",
-                "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ2/4e74676b1f7cc7229e6d3.txt",
-            ]:
-                print("DEBUGGING")
+            # if ocr_path in [
+                # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/7forms_IMG/POS01/1.pdf.txt",  # lost title
+                # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/7forms_IMG/POS04/27.pdf.txt",  # lost title
+                # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/7forms_IMG/POS04/32.pdf.txt",  # lost title
+                # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/TDDG/4e603ec0a1d7798920c6.txt", #threshold was a bit high (0.86 vs 0.91)
+            #     "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/DCYCBH/5a77fc5784405c1e05512.txt", #threshold was a bit high
+            #     "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/GUQ2/9f42f901a71c7f42260d1.txt", #shorten ocr str was too long => should have a threshold for corrected score #TODO
+            # ]:
+            #     print("DEBUGGING ", ocr_path)
+            ocr_path ="/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/7forms_IMG/POS04/32.pdf.txt"
+
+            # if gt not in ["POS01"]:
+                # continue
             pred = self.classify(ocr_path)
             y_pred.append(pred)
             y_true.append(gt)
@@ -362,7 +360,10 @@ class RuleBaseDocClassifier(BaseDocClasifier):
             df["diff"] = diff
             df.to_csv(f"{df_path}_pred.csv")
         print(classification_report(y_true, y_pred))
-        print(confusion_matrix(y_true, y_pred, labels=set(list(df["label"].values) + ["OTHERS"])))
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+            #https://stackoverflow.com/questions/19124601/pretty-print-an-entire-pandas-series-dataframe
+            labels = list(set(list(df["label"].values) + ["OTHERS"]))
+            print(pd.DataFrame(confusion_matrix(y_true, y_pred, labels=labels), index=labels, columns=labels))
         return y_true, y_pred
 
 
@@ -380,7 +381,7 @@ if __name__ == "__main__":
     df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_and_Samsung.csv"
     # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_val.csv`"
     # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/202302_3forms.csv"
-    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(df_path, save_pred=False)
+    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(df_path, save_pred=True)
     # # %%
     # # %%
 
