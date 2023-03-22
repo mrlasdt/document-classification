@@ -1,6 +1,8 @@
 data/
 results/
 weights/
+externals/
+misc/
 .vscode
 
 # Byte-compiled / optimized / DLL files

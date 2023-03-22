@@ -5,8 +5,8 @@ LAYOUTLMV3_CFG = {
         "custom": True,
         "path": "src/models/layoutlmv3/load_data.py",
         "method": "load_data",
-        "df_path": "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_and_Samsung.csv",
-        'pretrained_processor_path': '/mnt/ssd500/hungbnt/DocumentClassification/weights/layoutlmv3/processor',
+        "df_path": "data/FWD_and_Samsung.csv",
+        'pretrained_processor_path': 'weights/layoutlmv3/processor',
         'labels': DOC_LABELS,
         "image_shape": (3, 224, 224),
         "max_seq_len": 512,
@@ -22,7 +22,7 @@ LAYOUTLMV3_CFG = {
         "custom": True,
         "path": "src/models/layoutlmv3/load_model.py",
         "method": "load_model",
-        "pretrained_model_path": '/mnt/ssd500/hungbnt/DocumentClassification/weights/layoutlmv3/pretrained',
+        "pretrained_model_path": 'weights/layoutlmv3/pretrained',
         "labels": DOC_LABELS
     },
 
@@ -38,7 +38,7 @@ LAYOUTLMV3_CFG = {
         "path": "src/models/layoutlmv3/load_trainer.py",
         "method": "load_trainer",
         "labels": DOC_LABELS,
-        "save_dir": '/mnt/ssd500/hungbnt/DocumentClassification/weights/layoutlmv3/finetune',
+        "save_dir": 'weights/layoutlmv3/finetune',
         "n_epoches": 32,
         "device": DEVICE,
     },

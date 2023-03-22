@@ -13,7 +13,7 @@ from transformers import PhobertTokenizer
 from functools import partial
 
 
-def convert_word_bbox_to_word_group_bbox(lbboxes, lwords) -> tuple[list, list]:
+def convert_word_bbox_to_word_group_bbox(lbboxes, lwords) -> Tuple[list, list]:
     lWords = [Word(text=word, bndbox=bbox) for word, bbox in zip(lwords, lbboxes)]
     list_lines, _ = words_to_lines(lWords)
     lwords_ = list()

@@ -5,8 +5,8 @@ LAYOUTXLM_CFG = {
         "custom": True,
         "path": "src/models/layoutxlm/load_data.py",
         "method": "load_data",
-        "df_path": "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD_and_Samsung.csv",
-        'pretrained_tokenizer_path': '/mnt/ssd500/hungbnt/DocumentClassification/weights/layoutxlm/tokenizer',
+        "df_path": "data/FWD_and_Samsung.csv",
+        'pretrained_tokenizer_path': 'weights/layoutxlm/tokenizer',
         'labels': DOC_LABELS,
         "image_shape": (3, 224, 224),
         "max_seq_len": 512,
@@ -22,7 +22,7 @@ LAYOUTXLM_CFG = {
         "custom": True,
         "path": "src/models/layoutxlm/load_model.py",
         "method": "load_model",
-        "pretrained_model_path": '/mnt/ssd500/hungbnt/DocumentClassification/weights/layoutxlm/pretrained',
+        "pretrained_model_path": 'weights/layoutxlm/pretrained',
         "labels": DOC_LABELS
     },
 
@@ -38,7 +38,7 @@ LAYOUTXLM_CFG = {
         "path": "src/models/layoutxlm/load_trainer.py",
         "method": "load_trainer",
         "labels": DOC_LABELS,
-        "save_dir": '/mnt/ssd500/hungbnt/DocumentClassification/weights/layoutxlm/finetune',
+        "save_dir": 'weights/layoutxlm/finetune',
         "n_epoches": 32,
         "device": DEVICE,
     },

@@ -36,7 +36,7 @@ def compute_metrics(p, idx2label):
         }
 
 
-training_args = TrainingArguments(output_dir="/mnt/ssd500/hungbnt/DocumentClassification/weights/lilt/finetune",
+training_args = TrainingArguments(output_dir="weights/lilt/finetune",
                                   num_train_epochs=32,
                                   learning_rate=5e-5,
                                   evaluation_strategy="steps",

@@ -42,7 +42,7 @@ def read_ocr_result_from_txt(file_path: str) -> tuple[list, list]:
         if line == "":
             continue
         x1, y1, x2, y2, text = line.split("\t")
-        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        # x1, y1, x2, y2 = int(float(x1)), int(float(y1)), int(float(x2)), int(float(y2))
         if text and text != " ":
             words.append(text)
             boxes.append((x1, y1, x2, y2))
@@ -157,4 +157,3 @@ def visualize_bbox_and_label(
             fdraw_bbox(*arg_rec_text, **kwarg_rec_text)
             fdraw_text(*arg_text, **kwarg_text)  # text have to put in front of rec_text
     return np.array(img) if ori_img_type is np.ndarray and is_vnese else img
-

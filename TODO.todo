@@ -1,4 +1,8 @@
-☐ Fix ---000 problem in GUQ1
-☐ fix the algorithm so that right_idx is correct (always larger than i+lcs)
-☐ fix classify by template number
-☐ implement ensemble classifier
+✔ Fix ---000 problem in GUQ1 @done (2/27/2023, 4:44:53 PM)
+✔ fix the algorithm so that right_idx is correct (always larger than i+lcs) @done (3/15/2023, 2:57:13 PM)
+☐ fix classify by template number?
+☐ implement ensemble classifier?
+☐ test deskew after rotation
+☐ test word level subsequence and charlevel subsequence
+
+

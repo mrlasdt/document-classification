@@ -34,7 +34,7 @@ class DonutDatasetForDocumentClassification(Dataset):
         df: pd.DataFrame,
         processor,
         max_length: int,
-        labels: list[int],
+        labels: List[int],
         split: str,
         ignore_id: int = -100,
         task_start_token: str = "<s>",
@@ -168,9 +168,9 @@ if __name__ == "__main__":
     from config import global_var as cfg
     from transformers import DonutProcessor
 
-    df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD.csv"
+    df_path = "data/FWD.csv"
     processor = DonutProcessor.from_pretrained(
-        "/mnt/ssd500/hungbnt/DocumentClassification/weights/pretrained/clova_donut_processor")
+        "weights/pretrained/clova_donut_processor")
     max_seq_len = 4
     labels = cfg.DOC_LABELS
     batch_size = 8
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     b[0].shape
     # # batch["pixel_values"]
     # # %%
-    # df_path = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD.csv"
+    # df_path = "data/FWD.csv"
     # df = pd.read_csv(df_path)
 
     # df
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     # sys.path.append("/mnt/ssd500/hungbnt/DocumentClassification")
     # from config import config as cfg
     # processor = DonutProcessor.from_pretrained(
-    #     "/mnt/ssd500/hungbnt/DocumentClassification/weights/pretrained/clova_donut_processor")
+    #     "weights/pretrained/clova_donut_processor")
     # dataset = DonutDatasetForDocumentClassification(df, processor, max_length=4)
     # dataset.add_tokens([dataset.end_tag(l) for l in cfg.LABELS])
     # len(dataset)

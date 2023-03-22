@@ -1,21 +1,24 @@
-#bash scripts/run_ocr.sh -i data/FWD/33forms -o results/ocr/FWD/33forms
-
-export PYTHONPATH="$PYTHONPATH:/home/sds/thucpd/develop_OCR/TextDetectionApi/components/mmdetection"
-export PYTHONPATH="$PYTHONPATH:/home/sds/datnt/mmocr"
+#bash scripts/run_ocr.sh -i /mnt/hdd2T/hoanglv/Datasets/FWD -o results/ocr/FWD/230306_forms -e out.csv -k "{\"device\":\"cuda:1\"}" -x True
+#bash scripts/run_ocr.sh -i '/mnt/hdd2T/hoanglv/Datasets/FWD/01_Classified_forms/BC\ kiem\ tra\ y\ te/' -o results/ocr/FWD/230306_forms/01_Classified_forms -e out.csv -k "{\"device\":\"cuda:1\"}" -x 1
 export PYTHONWARNINGS="ignore"
 
-while getopts i:o: flag
+while getopts i:o:b:e:x:k: flag
 do
     case "${flag}" in
         i) img=${OPTARG};;
         o) out_dir=${OPTARG};;
+        b) base_dir=${OPTARG};;
+        e) export_csv=${OPTARG};;
+        x) export_img=${OPTARG};;
+        k) ocr_kwargs=${OPTARG};;
     esac
 done
+echo "python externals/ocr_sdsv/api.py --image=\"$img\" --save_dir \"$out_dir\" --base_dir \"$base_dir\" --export_csv \"$export_csv\" --export_img \"$export_img\" --ocr_kwargs \"$ocr_kwargs\""
 
-python externals/ocr/api.py \
-    --image  $img \
-    --save_dir  $out_dir\
-    --det_cfg /home/sds/datnt/mmdetection/logs/textdet-fwd-20221226/yolox_s_8x8_300e_cocotext_1280.py \
-    --det_ckpt /home/sds/datnt/mmdetection/logs/textdet-fwd-20221226/best_lite.pth \
-    --cls_cfg /home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/satrn_big.py \
-    --cls_ckpt /home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/best.pth
+python externals/ocr_sdsv/run.py \
+    --image="$img" \
+    --save_dir  $out_dir \
+    --export_csv $export_csv\
+    --export_img $export_img\
+    --ocr_kwargs $ocr_kwargs\
+

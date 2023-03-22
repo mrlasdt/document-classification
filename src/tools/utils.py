@@ -48,4 +48,4 @@ def construct_file_path(dir: str, file_path: str, parent_level: int = -1, ext: s
 if __name__ == "__main__":
     # %%
     construct_file_path(
-        "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/Samsung/DCYCBH/1b36d9f280ef58b101fe7.txt")
+        "results/ocr/Samsung/DCYCBH/1b36d9f280ef58b101fe7.txt")

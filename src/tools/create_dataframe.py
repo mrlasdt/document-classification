@@ -1,9 +1,21 @@
-from src.tools.utils import construct_file_path
 from pathlib import Path
 import pandas as pd
 import os
+import argparse
 
-image_extensions = (".jpg", ".jpeg", ".png", ".bmp")  # Add any other extensions you want to include
+from src.tools.utils import construct_file_path
+from externals.ocr_sdsv import ImageReader
+image_extensions = ImageReader.supported_ext
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    # parser image
+    parser.add_argument("--img_dir", type=str, required=True, help="path to image data directory")
+    parser.add_argument("--ocr_dir", type=str, required=True, help="path to ocr text directory")
+    parser.add_argument("--out_file", type=str, required=True, help="path of file to save the dataframe")
+    opt = parser.parse_args()
+    return opt
 
 
 def create_df_dataloader_from_data_dir(data_dir: str, ocr_dir: str):
@@ -26,11 +38,10 @@ def create_df_dataloader_from_data_dir(data_dir: str, ocr_dir: str):
 
 
 if __name__ == "__main__":
-    # data_dir = "/mnt/ssd500/hungbnt/DocumentClassification/data/FWD/33forms_IMG"
-    # ocr_dir = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/33forms"
-    # save_dir = "/mnt/ssd500/hungbnt/DocumentClassification/data/"
-    data_dir = "/mnt/hdd2T/AICR/Projects/2023/FWD/Forms/Images/02_2023/"
-    ocr_dir = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/202302_3forms"
-    save_dir = "/mnt/ssd500/hungbnt/DocumentClassification/data/"
-    df = create_df_dataloader_from_data_dir(data_dir, ocr_dir)
-    df.to_csv(f"{save_dir}/202302_3forms.csv", index=False)
+    # data_dir = "data/FWD/33forms_IMG"
+    # ocr_dir = "results/ocr/FWD/33forms"
+    # save_dir = "data/"
+
+    opt = get_args()
+    df = create_df_dataloader_from_data_dir(opt.img_dir, opt.ocr_dir)
+    df.to_csv(f"{opt.out_file}", index=False)

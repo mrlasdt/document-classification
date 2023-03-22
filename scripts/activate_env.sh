@@ -1,0 +1,1 @@
+source activate /home/sds/miniconda3/envs/hungbnt_kie_no_mmocr

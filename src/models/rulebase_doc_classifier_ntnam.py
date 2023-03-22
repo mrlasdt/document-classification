@@ -27,17 +27,13 @@ DET_CKPT = "/home/sds/datnt/mmdetection/logs/textdet-fwd/best_bbox_mAP_epoch_100
 CLS_CFG = "/home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/satrn_big.py"
 CLS_CKPT = "/home/sds/datnt/mmocr/logs/satrn_big_2022-10-31/best.pth"
 # DF_DOC_PATH = "data/Static/FWD_documents_list.csv"
-# DF_DOC_PATH = "data/Static/FWD_documents_list_custom_for_16forms.csv"
-DF_DOC_PATH = "data/Static/230306_forms.xlsx"
-DF_VAL_PATH = "data/230306_forms.csv"
+DF_DOC_PATH = "data/Static/FWD_documents_list_custom_for_16forms.csv"
 ACCEPTED_EXT = [".pdf", ".png", ".jpg", ".jpeg"]
 OTHERS_LABEL = "OTHERS"
-# fine_corrected_coef seems to decrease the performance? (see the case of results/ocr/Samsung/TDDG/e5e48b5e1449cc1795584.txt)
-THRESHHOLDS = {"coarse": 0.7, "fine": 0.91, "fine_corrected": 1.0}
-MAX_LENGTH = 60
-OFFSET_LCS = 0.0  # use for the lcs with index function to offset the return len of string
-# a title is considered prior to another title if lcs(t1,t2) > THRESHOLDs['fine'] + OFFSET_PRIOR and len(t1) > len(t2)
-OFFSET_PRIOR = 0.03
+# fine_corrected_coef seems to br a decrease the performance? (see the case of results/ocr/Samsung/TDDG/e5e48b5e1449cc1795584.txt)
+THRESHHOLDS = {"coarse": 0.8, "fine": 0.9, "fine_corrected_coef": 0.0}
+MAX_LENGTH = 55
+OFFSET = 0.0
 
 
 def longestCommonSubsequence(text1: str, text2: str) -> int:
@@ -97,14 +93,15 @@ def longest_common_subsequence_with_idx(X, Y):
             i -= 1
         else:
             j -= 1
-    return lcs, i, max(i + lcs, right_idx)
+    # TODO: fix the algorithm so that right_idx is correct (always larger than i+lcs)
+    return lcs, i, max(i + lcs, right_idx - 1)
 
 
 class RuleBaseDocClassifier(BaseDocClasifier):
     def __init__(
             self, df_doc_path: str, ocr_engine: OcrEngineForYoloX = None, accepted_ext: List[str] = ACCEPTED_EXT,
-            other_docid: str = OTHERS_LABEL, thresholds: dict = THRESHHOLDS, max_length: int = MAX_LENGTH,
-            offset_lcs: float = OFFSET_LCS, offset_prior: float = OFFSET_PRIOR):
+            other_docid: str = OTHERS_LABEL, thresholds: float = THRESHHOLDS, max_length: int = MAX_LENGTH,
+            offset: float = OFFSET):
         """ Classify document base on defined rule
         Args:
             df_doc_path (str): _description_
@@ -121,8 +118,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         self.ddoc_title_to_docid, self.ddoc_title_to_no_pages = self.extract_dict_from_excel(df_doc_path)
         self.max_length = max_length
         self.thresholds = thresholds
-        self.offset_lcs = offset_lcs
-        self.offset_prior = offset_prior
+        self.offset = offset
         self.dpriority_docid = self.generate_priority_dict()
 
     def generate_priority_dict(self):
@@ -137,8 +133,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         dprior = defaultdict(list)
         for ititle, idocid in self.ddoc_title_to_docid.items():
             for jtitle, jdocid in self.ddoc_title_to_docid.items():
-                match_score = longestCommonSubsequence(jtitle, ititle) / len(jtitle)
-                if match_score > self.thresholds["fine"] + self.offset_prior and len(jtitle) < len(ititle):
+                if jtitle in ititle and len(jtitle) < len(ititle):
                     dprior[jdocid].append(idocid)
         return dprior
 
@@ -153,19 +148,16 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         res = {ele[0]: ele[1] for ele in l}
         return res
 
-    def extract_dict_from_excel(self, df_path: str) -> Tuple[dict[str, str], dict[str, int]]:
-        # df = pd.read_excel(df_path, index_col=0) if df_path.endswith(".xlsx") else pd.read_csv(df_path, index_col=0)
-        # df.dropna(how="all", inplace=True)
-        # df = df[df["Do_classify(Y/N)"] == 1]
+    def extract_dict_from_excel(self, df_path: str) -> Tuple[dict[str, str], dict[str, str]]:
+        df = pd.read_excel(df_path, index_col=0) if df_path.endswith(".xlsx") else pd.read_csv(df_path, index_col=0)
+        df.dropna(how="all", inplace=True)
+        df = df[df["Do_classify(Y/N)"] == 1]
         # prioritize the form with longer title length
-        ## df.sort_values(by='Title', key=lambda x: len(x), inplace=True, ascending=False)
-        df = pd.read_excel(df_path) if df_path.endswith(".xlsx") else pd.read_csv(df_path, index_col=0)
-        ddoc_title_to_docid = {title: docid for title, docid in zip(df['Title'], df["DocID"]) if isinstance(
-            title, str) and isinstance(docid, str)}  # eliminate all nan columns (float value)
+        # df.sort_values(by='Title', key=lambda x: len(x), inplace=True, ascending=False)
+        ddoc_title_to_docid = dict(zip(df['Title'], df["DocID"]))
         ddoc_title_to_docid = self._sort_dict_by_key_length(ddoc_title_to_docid, reverse=True)
-        df_no_pages = [1] * len(df["Title"])  # TODO: just for testing
-        # ddoc_title_to_no_pages = dict(zip(df['Title'], df["No. pages"])) | {self.other_docid: 0}
-        ddoc_title_to_no_pages = dict(zip(df['Title'], df_no_pages)) | {self.other_docid: 1}
+
+        ddoc_title_to_no_pages = dict(zip(df['Title'], df["No. pages"])) | {self.other_docid: 0}
         return ddoc_title_to_docid, ddoc_title_to_no_pages
 
     def read_from_dir(self, dir_path: str, include_txt: bool = True) -> Dict[str,
@@ -264,31 +256,28 @@ class RuleBaseDocClassifier(BaseDocClasifier):
 
     def classify_by_title(
             self, lwords: List[str],
-            thresholds: dict[str, float],
+            thresholds: Tuple[float, float],
             max_length: int, offset: float) -> str:
         ocr_str = "".join(lwords[:max_length])
         best_docid = ""
         best_score = 0.0
         for title, docid in self.ddoc_title_to_docid.items():
-            if docid in ["BCHTD"]:
-                print("DEBUGGING")
-            title = title.replace(" ", "").replace('BảngCâuhỏiBệnhTiểuĐường',
-                                                   "hỏiBệnhTiểuĐường").strip()  # TODO: Fix this in static file
+            # if docid in ["TKSK"]:
+            #     print("DEBUGGING")
+            title = title.replace(" ", "")
             coarse_score, start_idx_lcs, end_idx_lcs = self.lcs_matching(ocr_str, title, "coarse")
             if coarse_score < thresholds["coarse"]:
                 continue
-            shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - offset)):int((end_idx_lcs) * (1 + offset))]
+            shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - offset)):int((end_idx_lcs + 1) * (1 + offset))]
             shorten_ocr_str = self.customize_preprocess_for_specific_docid(docid, shorten_ocr_str)
             fine_score, _, _ = self.lcs_matching(shorten_ocr_str, title, "fine")
-            if fine_score < thresholds["fine"]:
-                continue
             corrected_coef = len(title) / len(shorten_ocr_str)
             corrected_score = fine_score * corrected_coef
-            if corrected_score > best_score and best_docid not in self.dpriority_docid[docid]:
+            if fine_score > thresholds["fine"] and corrected_coef > thresholds["fine_corrected_coef"] and corrected_score > best_score and best_docid not in self.dpriority_docid[docid]:
                 best_docid = docid
                 best_score = corrected_score
-            if best_score >= thresholds["fine_corrected"]:
-                return best_docid
+            if best_score == 1.0:
+                return best_docid  # improve efficiency, no need to loop through all title if best_score is already 1.0
         return best_docid
 
     def preprocess(self, input_path: str) -> List[str]:
@@ -306,7 +295,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         # cls_ = RuleBaseDocClassifier.classify_by_template_number(lwords, max_length)
         # if cls_ == -1:
         cls_ = self.classify_by_title(lwords, max_length=self.max_length,
-                                      thresholds=self.thresholds, offset=self.offset_lcs)
+                                      thresholds=self.thresholds, offset=self.offset)
         return self.other_docid if not cls_ else cls_
 
     def infer(self, dir_path: str):
@@ -341,7 +330,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         diff = []
         for i, ocr_path in tqdm(enumerate(df["ocr_path"])):
 
-            gt = df["label_char"].iloc[i]
+            gt = df["label"].iloc[i]
             # if ocr_path in [
             # "results/ocr/FWD/7forms_IMG/POS01/1.pdf.txt",  # lost title
             # "results/ocr/FWD/7forms_IMG/POS04/27.pdf.txt",  # lost title
@@ -352,56 +341,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
             # ]:
             #     print("DEBUGGING ", ocr_path)
             # ocr_path ="results/ocr/FWD/7forms_IMG/POS04/32.pdf.txt"
-            if ocr_path in [
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi so thich dua xe/00206BF7E1DF230302130859.txt",  # blank
-                    # no title (should be other)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/TT TO CHUC DN-2.txt",
-                    # no title (should be other)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/TT TO CHUC DN-1.txt",
-                    # no title (should be other)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/00206BF7E1DF230302130859.txt",
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tieu duong/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dong kinh/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/00206BF7E1DF230302130859.txt",  # blank
-                    # too much noise due to screen captured
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/20230305_214607.txt",
-                    # too much noise due to screen captured
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/20230305_214613.txt",
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh tim mach/00206BF7E1DF230302130859.txt",  # blank
-                    # failed to rotate due to 2 documents presented
-                    # failed to rotate due to 2 documents presented
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/DS NV tham gia BH/DS NV THAM GIA BH-3.txt",
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/DS NV tham gia BH/00206BF7E1DF230302130859.txt",  # blank
-                    # failed to rotate due to 2 documents presented (no bbox found)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/BCH NGUOI NUOC NGOAI-2.jpg"
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/00206BF7E1DF230302130859.txt",  # blank
-                    # too much noise due to screen captured
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/20230305_214743.txt",
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/BCH SUYEN-5.txt" #words to lines error
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH chi tiet ve suc khoe_da day/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi tai chinh/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH chi tiet SK/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-4.txt", # failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-6.txt", # failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-1.txt", # failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-7.txt", #words to lines failed
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/BCH CHAN THUONG DAU-3.txt" #failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/BCH CHAN THUONG DAU-2.txt" #failed to rotate
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/BCH TAI CHINH PO-LA-3.txt" #failed to rotate
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/BCH TAI CHINH PO-LA-5.txt"  # wrong label
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dau that nguc/BCH DAU THAT NGUC-1.txt", #ocr failed
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dau that nguc/00206BF7E1DF230302130859.txt"  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau kk thong tin hoan tien/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau ke khai truong hop nguoi dong phi la nguoi than cua BMBH/DONG PHI LA NGUOI THAN-3.txt", #failed to rotate
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau ke khai truong hop nguoi dong phi la nguoi than cua BMBH/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Don chap thuan bao hiem/00206BF7E1DF230302130859.txt",  # blank
-            ]:
-                continue
-            # ocr_path = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tieu duong/00206BF7E1DF230302130827.txt"
+
             # if gt not in ["POS01"]:
             # continue
             pred = self.classify(ocr_path)
@@ -412,7 +352,7 @@ class RuleBaseDocClassifier(BaseDocClasifier):
                 print("*" * 100)
                 print(df["img_path"].iloc[i])
                 print(ocr_path)
-                print(pred, gt)
+                print(gt, pred)
         if save_pred:
             df["pred"] = y_pred
             df["diff"] = diff
@@ -420,8 +360,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         print(classification_report(y_true, y_pred))
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
             # https://stackoverflow.com/questions/19124601/pretty-print-an-entire-pandas-series-dataframe
-            labels = list(set(list(df["label_char"].values) + ["OTHERS"]))
-            # print(pd.DataFrame(confusion_matrix(y_true, y_pred, labels=labels), index=labels, columns=labels))
+            labels = list(set(list(df["label"].values) + ["OTHERS"]))
+            print(pd.DataFrame(confusion_matrix(y_true, y_pred, labels=labels), index=labels, columns=labels))
         return y_true, y_pred
 
 
@@ -436,10 +376,10 @@ if __name__ == "__main__":
 
     # %%
     # df_path = "data/33forms_pred.csv"
-    # df_path = "data/FWD_and_Samsung.csv"
+    df_path = "data/FWD_and_Samsung.csv"
     # df_path = "data/FWD_val.csv`"
     # df_path = "data/202302_3forms.csv"
-    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(DF_VAL_PATH, save_pred=False)
+    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(df_path, save_pred=True)
     # # %%
     # # %%
 
