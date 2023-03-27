@@ -33,7 +33,7 @@ DF_VAL_PATH = "data/230306_forms.csv"
 ACCEPTED_EXT = [".pdf", ".png", ".jpg", ".jpeg"]
 OTHERS_LABEL = "OTHERS"
 # fine_corrected_coef seems to decrease the performance? (see the case of results/ocr/Samsung/TDDG/e5e48b5e1449cc1795584.txt)
-THRESHHOLDS = {"coarse": 0.7, "fine": 0.91, "fine_corrected": 1.0}
+THRESHHOLDS = {"coarse": 0.7, "fine": 0.9, "fine_corrected": 1.0}
 MAX_LENGTH = 60
 OFFSET_LCS = 0.0  # use for the lcs with index function to offset the return len of string
 # a title is considered prior to another title if lcs(t1,t2) > THRESHOLDs['fine'] + OFFSET_PRIOR and len(t1) > len(t2)
@@ -258,9 +258,16 @@ class RuleBaseDocClassifier(BaseDocClasifier):
             lcs_len = longestCommonSubsequence(unidecode(ocr_str).lower(), unidecode(title).lower())
             # there is a case like POS03 shorten_ocr_str contains POS01 inside, so POS01 was misclassied as POS03 since the lcs/len(title) score was 1.0 => corrected by a term len(title)/len(shorten_ocr_str)
             fine_score = lcs_len / len(title)
-            return fine_score, 0, 0
+            return fine_score, 0, -1
         else:
             raise ValueError("Invalid mode: ", mode)
+
+    def compute_corrected_score(self, fine_score_: float, title_: str, shorten_ocr_str_: str) -> float:
+        corrected_coef = len(title_) / len(shorten_ocr_str_)
+        left_score, _, _ = self.lcs_matching(shorten_ocr_str_[:len(title_)], title_, "fine")
+        right_score, _, _ = self.lcs_matching(shorten_ocr_str_[-len(title_):], title_, "fine")
+        corrected_score_ = (fine_score_ * corrected_coef + right_score + left_score) / 3
+        return corrected_score_
 
     def classify_by_title(
             self, lwords: List[str],
@@ -270,10 +277,10 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         best_docid = ""
         best_score = 0.0
         for title, docid in self.ddoc_title_to_docid.items():
-            if docid in ["BCHTD"]:
+            if docid in ["BCHBTM", "BCHCHA"]:
                 print("DEBUGGING")
-            title = title.replace(" ", "").replace('BảngCâuhỏiBệnhTiểuĐường',
-                                                   "hỏiBệnhTiểuĐường").strip()  # TODO: Fix this in static file
+            # .replace('BảngCâuhỏiBệnhTiểuĐường',"hỏiBệnhTiểuĐường").strip()  # TODO: Fix this in static file
+            title = title.replace(" ", "")
             coarse_score, start_idx_lcs, end_idx_lcs = self.lcs_matching(ocr_str, title, "coarse")
             if coarse_score < thresholds["coarse"]:
                 continue
@@ -282,13 +289,12 @@ class RuleBaseDocClassifier(BaseDocClasifier):
             fine_score, _, _ = self.lcs_matching(shorten_ocr_str, title, "fine")
             if fine_score < thresholds["fine"]:
                 continue
-            corrected_coef = len(title) / len(shorten_ocr_str)
-            corrected_score = fine_score * corrected_coef
+            corrected_score = self.compute_corrected_score(fine_score, title, shorten_ocr_str)
             if corrected_score > best_score and best_docid not in self.dpriority_docid[docid]:
                 best_docid = docid
                 best_score = corrected_score
             if best_score >= thresholds["fine_corrected"]:
-                return best_docid
+                return best_docid  # improve efficiency
         return best_docid
 
     def preprocess(self, input_path: str) -> List[str]:
@@ -353,55 +359,59 @@ class RuleBaseDocClassifier(BaseDocClasifier):
             #     print("DEBUGGING ", ocr_path)
             # ocr_path ="results/ocr/FWD/7forms_IMG/POS04/32.pdf.txt"
             if ocr_path in [
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi so thich dua xe/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi so thich dua xe/00206BF7E1DF230302130859.txt",  # blank
                     # no title (should be other)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/TT TO CHUC DN-2.txt",
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/TT TO CHUC DN-2.txt",
                     # no title (should be other)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/TT TO CHUC DN-1.txt",
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/TT TO CHUC DN-1.txt",
                     # no title (should be other)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/00206BF7E1DF230302130859.txt",
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tieu duong/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dong kinh/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Thong tin to chuc doanh nghiep/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tieu duong/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dong kinh/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/00206BF7E1DF230302130859.txt",  # blank
                     # too much noise due to screen captured
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/20230305_214607.txt",
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/20230305_214607.txt",
                     # too much noise due to screen captured
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/20230305_214613.txt",
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh tim mach/00206BF7E1DF230302130859.txt",  # blank
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH su dung ruou bia/20230305_214613.txt",
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh tim mach/00206BF7E1DF230302130859.txt",  # blank
                     # failed to rotate due to 2 documents presented
-                    # failed to rotate due to 2 documents presented
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/DS NV tham gia BH/DS NV THAM GIA BH-3.txt",
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/DS NV tham gia BH/00206BF7E1DF230302130859.txt",  # blank
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/DS NV tham gia BH/DS NV THAM GIA BH-3.txt",
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/DS NV tham gia BH/00206BF7E1DF230302130859.txt",  # blank
                     # failed to rotate due to 2 documents presented (no bbox found)
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/BCH NGUOI NUOC NGOAI-2.jpg"
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/00206BF7E1DF230302130859.txt",  # blank
-                    # too much noise due to screen captured
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/20230305_214743.txt",
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/BCH SUYEN-5.txt" #words to lines error
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH chi tiet ve suc khoe_da day/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi tai chinh/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH chi tiet SK/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-4.txt", # failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-6.txt", # failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-1.txt", # failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-7.txt", #words to lines failed
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/BCH CHAN THUONG DAU-3.txt" #failed to rotate
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/BCH CHAN THUONG DAU-2.txt" #failed to rotate
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/BCH TAI CHINH PO-LA-3.txt" #failed to rotate
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/BCH TAI CHINH PO-LA-5.txt"  # wrong label
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dau that nguc/BCH DAU THAT NGUC-1.txt", #ocr failed
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dau that nguc/00206BF7E1DF230302130859.txt"  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau kk thong tin hoan tien/00206BF7E1DF230302130859.txt",  # blank
-                    # "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau ke khai truong hop nguoi dong phi la nguoi than cua BMBH/DONG PHI LA NGUOI THAN-3.txt", #failed to rotate
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau ke khai truong hop nguoi dong phi la nguoi than cua BMBH/00206BF7E1DF230302130859.txt",  # blank
-                    "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Don chap thuan bao hiem/00206BF7E1DF230302130859.txt",  # blank
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/BCH NGUOI NUOC NGOAI-2.txt",
+                    # failed to rotate due to 2 documents presented
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/BCH NGUOI NUOC NGOAI-3.txt",
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/00206BF7E1DF230302130859.txt",  # blank
+                    # # too much noise due to screen captured
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/20230305_214743.txt",
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/BCH SUYEN-5.txt" #words to lines error
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH benh hen suyen/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH chi tiet ve suc khoe_da day/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi tai chinh/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH chi tiet SK/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-4.txt",  # wrong label
+                    # failed to rotate due to 2 documents presented
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-6.txt",
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-1.txt",  # wrong label
+                    # failed to rotate due to 2 documents presented
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/BCH NGANH HANG KHONG-7.txt",
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi ve nganh hang khong/00206BF7E1DF230302130859.txt",  # blank
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/BCH CHAN THUONG DAU-3.txt", #failed to rotate
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/BCH CHAN THUONG DAU-2.txt", #ocr failed
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/cau hoi ve chan thuong dau/00206BF7E1DF230302130859.txt",  # blank
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/BCH TAI CHINH PO-LA-3.txt", #failed to rotate
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/BCH TAI CHINH PO-LA-5.txt",  # wrong label
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tai chinh PO LA/00206BF7E1DF230302130859.txt",  # blank
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dau that nguc/BCH DAU THAT NGUC-1.txt", #ocr failed
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH dau that nguc/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau kk thong tin hoan tien/00206BF7E1DF230302130859.txt",  # blank
+                    # "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau ke khai truong hop nguoi dong phi la nguoi than cua BMBH/DONG PHI LA NGUOI THAN-3.txt", #failed to rotate
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/mau ke khai truong hop nguoi dong phi la nguoi than cua BMBH/00206BF7E1DF230302130859.txt",  # blank
+                    "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Don chap thuan bao hiem/00206BF7E1DF230302130859.txt",  # blank
             ]:
                 continue
-            # ocr_path = "/mnt/ssd500/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/BCH tieu duong/00206BF7E1DF230302130827.txt"
+            # ocr_path = "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/BCH NGUOI NUOC NGOAI-3.txt"
+            # ocr_path = "/mnt/ssd1T/hungbnt/DocumentClassification/results/ocr/FWD/230306_forms/01_Classified_forms/Bang cau hoi cao huyet ap/20230228_095128.txt"
             # if gt not in ["POS01"]:
             # continue
             pred = self.classify(ocr_path)

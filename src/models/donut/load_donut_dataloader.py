@@ -164,7 +164,7 @@ def load_data(
 if __name__ == "__main__":
     # %% try load_data
     import sys
-    sys.path.append("/mnt/ssd500/hungbnt/DocumentClassification")
+    sys.path.append("/mnt/ssd1T/hungbnt/DocumentClassification")
     from config import global_var as cfg
     from transformers import DonutProcessor
 
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     # # %% try dataset
     # from transformers import DonutProcessor
     # import sys
-    # sys.path.append("/mnt/ssd500/hungbnt/DocumentClassification")
+    # sys.path.append("/mnt/ssd1T/hungbnt/DocumentClassification")
     # from config import config as cfg
     # processor = DonutProcessor.from_pretrained(
     #     "weights/pretrained/clova_donut_processor")

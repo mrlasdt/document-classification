@@ -14,9 +14,9 @@
             "args": [
                 "--image",
                 // "/mnt/hdd2T/hoanglv/Datasets/FWD",
-                "/mnt/hdd2T/hoanglv/Datasets/FWD/01_Classified_forms",
+                "/mnt/hdd2T/hoanglv/Datasets/FWD/01_Classified_forms_deskewed_1920/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/BCH NGUOI NUOC NGOAI-3.jpg",
                 "--save_dir",
-                "results/ocr/FWD/230306_forms/01_Classified_forms_pdeskew_1520",
+                "results/ocr/FWD/230306_forms/01_Classified_forms_pdeskew_1920_hoangmd/bang cau hoi ve noi cu ngu danh cho ng nuoc ngoai/BCH NGUOI NUOC NGOAI-3.txt",
                 "--export_csv",
                 "out.csv",
                 "--ocr_kwargs",
