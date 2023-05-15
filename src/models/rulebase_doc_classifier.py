@@ -16,9 +16,9 @@ from collections import defaultdict
 import pandas as pd
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, f1_score, roc_auc_score
 import pandas as pd
-from base_doc_classifier import BaseDocClasifier
 from unidecode import unidecode
 from collections import defaultdict
+from src.models.base_doc_classifier import BaseDocClasifier
 # INPUT_DIR = Path("data/Sample_input/Case_1_tach_roi-toan-bo")
 # SAVE_DIR = Path("results").joinpath(INPUT_DIR.name)
 
@@ -33,7 +33,8 @@ DF_VAL_PATH = "data/230306_forms.csv"
 ACCEPTED_EXT = [".pdf", ".png", ".jpg", ".jpeg"]
 OTHERS_LABEL = "OTHERS"
 # fine_corrected_coef seems to decrease the performance? (see the case of results/ocr/Samsung/TDDG/e5e48b5e1449cc1795584.txt)
-THRESHHOLDS = {"coarse": 0.7, "fine": 0.9, "fine_corrected": 1.0}
+THRESHHOLDS = {"coarse": 0.7, "fine": 0.9,
+               "fine_corrected": 0.45, "fine_corrected_skip": 1.0}
 MAX_LENGTH = 60
 OFFSET_LCS = 0.0  # use for the lcs with index function to offset the return len of string
 # a title is considered prior to another title if lcs(t1,t2) > THRESHOLDs['fine'] + OFFSET_PRIOR and len(t1) > len(t2)
@@ -45,7 +46,8 @@ def longestCommonSubsequence(text1: str, text2: str) -> int:
     dp = [[0] * (len(text2) + 1) for _ in range(len(text1) + 1)]
     for i, c in enumerate(text1):
         for j, d in enumerate(text2):
-            dp[i + 1][j + 1] = 1 + dp[i][j] if c == d else max(dp[i][j + 1], dp[i + 1][j])
+            dp[i + 1][j + 1] = 1 + \
+                dp[i][j] if c == d else max(dp[i][j + 1], dp[i + 1][j])
     return dp[-1][-1]
 
 
@@ -118,7 +120,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         self.df_doc_path = df_doc_path
         self.other_docid = other_docid
         self.accepted_ext = accepted_ext
-        self.ddoc_title_to_docid, self.ddoc_title_to_no_pages = self.extract_dict_from_excel(df_doc_path)
+        self.ddoc_title_to_docid, self.ddoc_title_to_no_pages = self.extract_dict_from_excel(
+            df_doc_path)
         self.max_length = max_length
         self.thresholds = thresholds
         self.offset_lcs = offset_lcs
@@ -137,7 +140,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         dprior = defaultdict(list)
         for ititle, idocid in self.ddoc_title_to_docid.items():
             for jtitle, jdocid in self.ddoc_title_to_docid.items():
-                match_score = longestCommonSubsequence(jtitle, ititle) / len(jtitle)
+                match_score = longestCommonSubsequence(
+                    jtitle, ititle) / len(jtitle)
                 if match_score > self.thresholds["fine"] + self.offset_prior and len(jtitle) < len(ititle):
                     dprior[jdocid].append(idocid)
         return dprior
@@ -149,7 +153,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         this is align with the self.classify_title algorithm and self.dpriority_docid dict
         """
         # https://www.geeksforgeeks.org/python-program-to-sort-dictionary-by-key-lengths/
-        l = sorted(list(d.items()), key=lambda key: len(key[0]), reverse=reverse)
+        l = sorted(list(d.items()), key=lambda key: len(
+            key[0]), reverse=reverse)
         res = {ele[0]: ele[1] for ele in l}
         return res
 
@@ -158,14 +163,17 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         # df.dropna(how="all", inplace=True)
         # df = df[df["Do_classify(Y/N)"] == 1]
         # prioritize the form with longer title length
-        ## df.sort_values(by='Title', key=lambda x: len(x), inplace=True, ascending=False)
-        df = pd.read_excel(df_path) if df_path.endswith(".xlsx") else pd.read_csv(df_path, index_col=0)
+        # df.sort_values(by='Title', key=lambda x: len(x), inplace=True, ascending=False)
+        df = pd.read_excel(df_path) if df_path.endswith(
+            ".xlsx") else pd.read_csv(df_path, index_col=0)
         ddoc_title_to_docid = {title: docid for title, docid in zip(df['Title'], df["DocID"]) if isinstance(
             title, str) and isinstance(docid, str)}  # eliminate all nan columns (float value)
-        ddoc_title_to_docid = self._sort_dict_by_key_length(ddoc_title_to_docid, reverse=True)
+        ddoc_title_to_docid = self._sort_dict_by_key_length(
+            ddoc_title_to_docid, reverse=True)
         df_no_pages = [1] * len(df["Title"])  # TODO: just for testing
         # ddoc_title_to_no_pages = dict(zip(df['Title'], df["No. pages"])) | {self.other_docid: 0}
-        ddoc_title_to_no_pages = dict(zip(df['Title'], df_no_pages)) | {self.other_docid: 1}
+        ddoc_title_to_no_pages = dict(zip(df['Title'], df_no_pages)) | {
+            self.other_docid: 1}
         return ddoc_title_to_docid, ddoc_title_to_no_pages
 
     def read_from_dir(self, dir_path: str, include_txt: bool = True) -> Dict[str,
@@ -204,7 +212,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         elif file_path.suffix in self.accepted_ext:  # the rest should be image files
             return read_image_file(str(file_path))
         else:
-            raise NotImplementedError("{} is not supported".format(file_path.suffix))
+            raise NotImplementedError(
+                "{} is not supported".format(file_path.suffix))
 
     @staticmethod
     def read_from_pdf(pdf_path: str) -> List[np.ndarray]:
@@ -216,7 +225,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         '''
         return list of (bbox, text) or list of list of (bbox, text)
         '''
-        lbboxes, lwords = self.ocr_engine.inference(img, batch_mode=batch_mode, batch_size=batch_size)
+        lbboxes, lwords = self.ocr_engine.inference(
+            img, batch_mode=batch_mode, batch_size=batch_size)
         if not isinstance(img, list):
             lbboxes, lwords = sort_bboxes_and_words(lbboxes, lwords)
             return lbboxes, lwords
@@ -250,12 +260,14 @@ class RuleBaseDocClassifier(BaseDocClasifier):
 
     def lcs_matching(self, ocr_str: str, title: str, mode: str) -> Tuple[float, int, int]:
         if mode == "coarse":
-            lcs_len, start_idx_lcs, end_idx_lcs = longest_common_subsequence_with_idx(ocr_str, title)
+            lcs_len, start_idx_lcs, end_idx_lcs = longest_common_subsequence_with_idx(
+                ocr_str, title)
             coarse_score = lcs_len / len(title)
             return coarse_score, start_idx_lcs, end_idx_lcs
         elif mode == "fine":
             # remove accent and lowercase may improve performance since the ocr text may have minor error
-            lcs_len = longestCommonSubsequence(unidecode(ocr_str).lower(), unidecode(title).lower())
+            lcs_len = longestCommonSubsequence(
+                unidecode(ocr_str).lower(), unidecode(title).lower())
             # there is a case like POS03 shorten_ocr_str contains POS01 inside, so POS01 was misclassied as POS03 since the lcs/len(title) score was 1.0 => corrected by a term len(title)/len(shorten_ocr_str)
             fine_score = lcs_len / len(title)
             return fine_score, 0, -1
@@ -264,9 +276,12 @@ class RuleBaseDocClassifier(BaseDocClasifier):
 
     def compute_corrected_score(self, fine_score_: float, title_: str, shorten_ocr_str_: str) -> float:
         corrected_coef = len(title_) / len(shorten_ocr_str_)
-        left_score, _, _ = self.lcs_matching(shorten_ocr_str_[:len(title_)], title_, "fine")
-        right_score, _, _ = self.lcs_matching(shorten_ocr_str_[-len(title_):], title_, "fine")
-        corrected_score_ = (fine_score_ * corrected_coef + right_score + left_score) / 3
+        left_score, _, _ = self.lcs_matching(
+            shorten_ocr_str_[:len(title_)], title_, "fine")
+        right_score, _, _ = self.lcs_matching(
+            shorten_ocr_str_[-len(title_):], title_, "fine")
+        corrected_score_ = (fine_score_ * corrected_coef +
+                            right_score + left_score) / 3
         return corrected_score_
 
     def classify_by_title(
@@ -277,23 +292,26 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         best_docid = ""
         best_score = 0.0
         for title, docid in self.ddoc_title_to_docid.items():
-            if docid in ["BCHBTM", "BCHCHA"]:
-                print("DEBUGGING")
-            # .replace('BảngCâuhỏiBệnhTiểuĐường',"hỏiBệnhTiểuĐường").strip()  # TODO: Fix this in static file
             title = title.replace(" ", "")
-            coarse_score, start_idx_lcs, end_idx_lcs = self.lcs_matching(ocr_str, title, "coarse")
+            coarse_score, start_idx_lcs, end_idx_lcs = self.lcs_matching(
+                ocr_str, title, "coarse")
             if coarse_score < thresholds["coarse"]:
                 continue
-            shorten_ocr_str = ocr_str[int(start_idx_lcs * (1 - offset)):int((end_idx_lcs) * (1 + offset))]
-            shorten_ocr_str = self.customize_preprocess_for_specific_docid(docid, shorten_ocr_str)
-            fine_score, _, _ = self.lcs_matching(shorten_ocr_str, title, "fine")
+            shorten_ocr_str = ocr_str[int(
+                start_idx_lcs * (1 - offset)):int((end_idx_lcs) * (1 + offset))]
+            shorten_ocr_str = self.customize_preprocess_for_specific_docid(
+                docid, shorten_ocr_str)
+            fine_score, _, _ = self.lcs_matching(
+                shorten_ocr_str, title, "fine")
             if fine_score < thresholds["fine"]:
                 continue
-            corrected_score = self.compute_corrected_score(fine_score, title, shorten_ocr_str)
-            if corrected_score > best_score and best_docid not in self.dpriority_docid[docid]:
+            corrected_score = self.compute_corrected_score(
+                fine_score, title, shorten_ocr_str)
+            if corrected_score > max(best_score, thresholds["fine_corrected"]) and best_docid not in self.dpriority_docid[docid]:
                 best_docid = docid
                 best_score = corrected_score
-            if best_score >= thresholds["fine_corrected"]:
+
+            if best_score >= thresholds["fine_corrected_skip"]:
                 return best_docid  # improve efficiency
         return best_docid
 
@@ -302,7 +320,8 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         if isinstance(input_, tuple):
             return input_  # read from txt
         if not self.ocr_engine:
-            raise ValueError("Please provide an OCR engine to read from {}".format(input_path))
+            raise ValueError(
+                "Please provide an OCR engine to read from {}".format(input_path))
         input_ = input_[0] if isinstance(input_, list) else input_
         return self.run_ocr(input_)
 
@@ -426,9 +445,10 @@ class RuleBaseDocClassifier(BaseDocClasifier):
         if save_pred:
             df["pred"] = y_pred
             df["diff"] = diff
-            df.to_csv(f"{df_path}_pred.csv")
+            df.to_csv(f"{df_val_path}_pred.csv")
         print(classification_report(y_true, y_pred))
-        with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+        # more options can be specified also
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             # https://stackoverflow.com/questions/19124601/pretty-print-an-entire-pandas-series-dataframe
             labels = list(set(list(df["label_char"].values) + ["OTHERS"]))
             # print(pd.DataFrame(confusion_matrix(y_true, y_pred, labels=labels), index=labels, columns=labels))
@@ -449,7 +469,8 @@ if __name__ == "__main__":
     # df_path = "data/FWD_and_Samsung.csv"
     # df_path = "data/FWD_val.csv`"
     # df_path = "data/202302_3forms.csv"
-    y_true, y_pred = RuleBaseDocClassifier(df_doc_path=DF_DOC_PATH).eval(DF_VAL_PATH, save_pred=False)
+    y_true, y_pred = RuleBaseDocClassifier(
+        df_doc_path=DF_DOC_PATH).eval(DF_VAL_PATH, save_pred=False)
     # # %%
     # # %%
 

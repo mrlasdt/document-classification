@@ -4,8 +4,8 @@ from .hub import get_entries
 # from .template_modules.metrics import __mapping__ as metric_maps
 # from .template_modules.trainers import __mapping__ as trainer_maps
 # from .template_modules.optimizers import __mapping__ as optimizer_map
-from .training.data import __mapping__ as datasets_map
-from .training.model import __mapping__ as models_map
+from .base.data import __mapping__ as datasets_map
+from .base.model import __mapping__ as models_map
 import os
 
 
@@ -30,7 +30,8 @@ class Runner:
             self.train, self.valid = self._get_data(config["data"])
             if verbose:
                 print("train: ", len(self.train))
-                print("valid: ", len(self.valid)) if self.valid is not None else None
+                print("valid: ", len(self.valid)
+                      ) if self.valid is not None else None
         if config["model"]:
             print("creating model") if verbose else None
             self.model = self._get_model(config["model"])
@@ -41,7 +42,8 @@ class Runner:
             self.trainer = self._get_trainer(config["trainer"])
             print("creating trainer ") if verbose else None
         if verbose:
-            save_model_txt_path = os.path.join(config["trainer"]['save_dir'], "model.txt")
+            save_model_txt_path = os.path.join(
+                config["trainer"]['save_dir'], "model.txt")
             print("printing model to ", save_model_txt_path)
             with open(save_model_txt_path, "w") as handle:
                 handle.write(str(self.model))
@@ -73,7 +75,8 @@ class Runner:
 
     def _get_optimizer(self, optimizer_config):
         if optimizer_config['custom'] == True:
-            return self._get_custom_module('trainer', optimizer_config, args=(self.model,))  # len(args)>2
+            # len(args)>2
+            return self._get_custom_module('trainer', optimizer_config, args=(self.model,))
         else:
             raise NotImplementedError("No template config found for trainer")
 
@@ -100,7 +103,8 @@ class Runner:
     def _get_custom_module(self, module_name, config, excludes=("custom", "path", "method"), args=[]):
         entries = get_entries(config["path"])
         lentries = entries.list()
-        assert config['method'] in lentries, 'Invalid method name in {} config'.format(module_name)
+        assert config['method'] in lentries, 'Invalid method name in {} config'.format(
+            module_name)
         kwargs = self._get_kwargs(config, excludes)
         return entries.load(config['method'], *args, **kwargs)
 

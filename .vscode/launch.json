@@ -20,7 +20,7 @@
                 "--export_csv",
                 "out.csv",
                 "--ocr_kwargs",
-                "{\"device\":\"cuda:0\"}",
+                "{\"device\":\"cuda:1\"}",
                 "--export_img",
                 "1",
             ]
